@@ -1,6 +1,7 @@
 import sys
 from OpenGL.GL import *
 from PIL import Image
+from pyengine.core.logger import Logger
 
 
 class Texture:
@@ -49,7 +50,7 @@ class Texture:
             glGenerateMipmap(GL_TEXTURE_2D)
             
         except IOError as e:
-            print(f"Failed to load texture '{filepath}': {e}")
+            Logger.info(f"Failed to load texture '{filepath}': {e}")
             sys.exit(1)
 
         # Unbind

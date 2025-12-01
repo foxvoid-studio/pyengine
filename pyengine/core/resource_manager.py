@@ -1,4 +1,5 @@
 from typing import Dict, Tuple
+from pyengine.core.logger import Logger
 from pyengine.gl_utils.texture import Texture
 from pyengine.gl_utils.shader import ShaderProgram
 
@@ -20,7 +21,7 @@ class ResourceManager:
         Returns a Texture. Loads it from disk if not already cached.
         """
         if path not in self._textures:
-            print(f"[ResourceManager] Loading new texture: {path}")
+            Logger.info(f"[ResourceManager] Loading new texture: {path}")
             self._textures[path] = Texture(path)
         
         return self._textures[path]
@@ -33,7 +34,7 @@ class ResourceManager:
         key = (vert_path, frag_path)
         
         if key not in self._shaders:
-            print(f"[ResourceManager] Loading new shader: {vert_path} | {frag_path}")
+            Logger.info(f"[ResourceManager] Loading new shader: {vert_path} | {frag_path}")
             self._shaders[key] = ShaderProgram.from_files(vert_path, frag_path)
             
         return self._shaders[key]
@@ -51,4 +52,5 @@ class ResourceManager:
             shader.destroy()
         self._shaders.clear()
         
-        print("[ResourceManager] All resources cleared.")
+        Logger.info("[ResourceManager] All resources cleared.")
+        

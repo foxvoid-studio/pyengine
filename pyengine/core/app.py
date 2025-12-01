@@ -2,6 +2,7 @@ import sys
 import ctypes
 from sdl2 import *
 from OpenGL.GL import *
+from pyengine.core.logger import Logger
 from pyengine.gl_utils.mesh import Triangle, Rectangle
 from pyengine.physics.transform import Transform
 from pyengine.graphics.mesh_renderer import MeshRenderer
@@ -23,6 +24,9 @@ class App:
         """
         Initializes SDL2, creates a window and an OpenGL context.
         """
+        Logger.init(name="GameApp", debug_mode=True)
+        Logger.info(f"Starting Engine: {width}x{height} - {title}")
+        
         self.title = title.encode("utf-8")
         self.width = width
         self.height = height
@@ -45,7 +49,7 @@ class App:
         """
         # Initialize the video subsystem
         if SDL_Init(SDL_INIT_VIDEO) != 0:
-            print(f"Failed to initialize SDL: {SDL_GetError()}")
+            Logger.critical(f"Failed to initialize SDL: {SDL_GetError()}")
             sys.exit(-1)
 
         # Set OpenGL attributes *before* creating the window.
@@ -66,7 +70,7 @@ class App:
         )
 
         if not self.window:
-            print(f"Failed to create window: {SDL_GetError()}")
+            Logger.critical(f"Failed to create window: {SDL_GetError()}")
             sys.exit(-1)
 
         # Create the OpenGL Context and attach it to the window

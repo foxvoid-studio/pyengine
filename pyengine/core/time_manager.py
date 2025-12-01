@@ -56,8 +56,6 @@ class TimeManager:
             self._current_fps = self._frame_count
             self._frame_count = 0
             self._fps_timer -= 1.0
-            # Optional: Print FPS to console for debugging
-            # print(f"FPS: {self._current_fps}")
 
     @property
     def delta_time(self) -> float:

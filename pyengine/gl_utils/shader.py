@@ -3,6 +3,7 @@ import glm
 from sdl2 import *
 from OpenGL.GL import *
 from OpenGL.GL import shaders
+from pyengine.core.logger import Logger
 
 # =============================================================================
 # Handles the compilation, linking, and management of GLSL shaders.
@@ -36,7 +37,7 @@ class ShaderProgram:
             return cls(vertex_code, fragment_code)
             
         except IOError as e:
-            print(f"Error loading shader files: {e}")
+            Logger.error(f"loading shader files: {e}")
             sys.exit(1)
 
     def _compile(self, vertex_code: str, fragment_code: str) -> None:
@@ -56,7 +57,7 @@ class ShaderProgram:
             glDeleteShader(vs)
             glDeleteShader(fs)
         except shaders.ShaderCompilationError as e:
-            print(f"Shader Compilation Error: {e}")
+            Logger.info(f"Shader Compilation Error: {e}")
             sys.exit(1)
 
     def use(self) -> None:

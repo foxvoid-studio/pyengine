@@ -1,5 +1,6 @@
 import glm
 from OpenGL.GL import *
+from pyengine.core.logger import Logger
 from pyengine.ecs.entity_manager import EntityManager
 from pyengine.physics.transform import Transform
 from pyengine.graphics.mesh_renderer import MeshRenderer
@@ -37,7 +38,7 @@ class RenderSystem:
         
         # If no main camera is found, we can't render properly (or render default)
         if not camera_component:
-            print("Warning: No MainCamera found in scene!")
+            Logger.warning("No MainCamera found in scene!")
             return
 
         # Pre-calculate Camera Matrices once per frame
