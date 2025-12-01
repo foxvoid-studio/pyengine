@@ -83,10 +83,17 @@ class Game3D(App):
         self.entity_manager.add_component(cube, MeshRenderer(cube_geo, mat_object))
 
         # --- Pyramid from obj file ---
-        mesh_pyramid = self.resources.get_mesh("assets/pyramid.obj", shader)
-        pyramid = self.entity_manager.create_entity()
-        self.entity_manager.add_component(pyramid, Transform(position=(2.0, 0.5, 0.0)))
-        self.entity_manager.add_component(pyramid, MeshRenderer(mesh_pyramid, mat_object))
+        # mesh_pyramid = self.resources.get_mesh("assets/pyramid.obj", shader)
+        # pyramid = self.entity_manager.create_entity()
+        # self.entity_manager.add_component(pyramid, Transform(position=(2.0, 0.5, 0.0)))
+        # self.entity_manager.add_component(pyramid, MeshRenderer(mesh_pyramid, mat_object))
+
+        # --- Pyramid from obj file ---
+        mesh_pyramid_part = self.resources.load_model("assets/pyramid.obj", shader)
+        for mesh, material in mesh_pyramid_part:
+            part_entity = self.entity_manager.create_entity()
+            self.entity_manager.add_component(part_entity, Transform(position=(2.0, 0.5, 0.0)))
+            self.entity_manager.add_component(part_entity, MeshRenderer(mesh, material))
 
 
 if __name__ == "__main__":

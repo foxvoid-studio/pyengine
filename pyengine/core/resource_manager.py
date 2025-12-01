@@ -1,9 +1,11 @@
-from typing import Dict, Tuple
+import os
+from typing import Dict, List, Tuple
 from pyengine.core.logger import Logger
 from pyengine.gl_utils.texture import Texture
 from pyengine.gl_utils.shader import ShaderProgram
 from pyengine.gl_utils.mesh import Mesh
-from pyengine.gl_utils.obj_loader import load_obj_file
+from pyengine.gl_utils.obj_loader import load_obj_model
+from pyengine.graphics.material import Material
 
 
 class ResourceManager:
@@ -45,6 +47,43 @@ class ResourceManager:
             
         return self._shaders[key]
     
+    def load_model(self, obj_path: str, shader: ShaderProgram) -> List[Tuple[Mesh, Material]]:
+        """
+        Loads a complex model (OBJ + MTL).
+        Returns a list of tuples: (Mesh, Material)
+        You should create one Entity per tuple.
+        """
+        parts = load_obj_model(obj_path)
+        results = []
+        
+        # Determine the base directory of the OBJ file
+        # If obj is "assets/models/car.obj", base_dir is "assets/models/"
+        base_dir = os.path.dirname(obj_path)
+
+        for part in parts:
+            # 1. Create Mesh
+            mesh = Mesh(shader, part['vertices'])
+            
+            # 2. Determine Material
+            texture = None
+            tex_path_raw = part['texture_path']
+            
+            if tex_path_raw:
+                # Construct full path: assets/models/ + wood.png
+                file_name = os.path.basename(tex_path_raw)
+                full_tex_path = os.path.join(base_dir, file_name)
+                
+                # Load texture (Cached automatically by get_texture)
+                texture = self.get_texture(full_tex_path)
+            
+            # Create Material
+            # If no texture found, it will be white (default color)
+            material = Material(shader, texture=texture)
+            
+            results.append((mesh, material))
+            
+        return results
+    
     def get_mesh(self, path: str, shader: ShaderProgram) -> Mesh:
         """
         Loads an OBJ file into a Mesh object.
@@ -53,7 +92,7 @@ class ResourceManager:
             Logger.debug(f"Loading mesh from disk: {path}")
             
             # 1. Parse Data
-            vertices = load_obj_file(path)
+            vertices = load_obj_model(path)
             
             # 2. Create Mesh Object
             # We use the base Mesh class since it takes raw vertices

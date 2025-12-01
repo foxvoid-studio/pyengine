@@ -4,100 +4,84 @@ import pywavefront
 from pyengine.core.logger import Logger
 
 
-def load_obj_file(file_path: str) -> np.ndarray:
+def load_obj_model(file_path: str):
     """
-    Loads an OBJ file using PyWavefront library.
-    Returns a flat numpy array of vertices suitable for glDrawArrays.
-    Format depends on the file, but we request T2F_V3F (Texture 2 floats, Position 3 floats).
+    Loads an OBJ file and separates geometry by material.
+    Returns a list of dictionaries: [{'vertices': np.array, 'texture_path': str|None}, ...]
     """
     if not os.path.exists(file_path):
         Logger.error(f"OBJ File not found: {file_path}")
-        return np.array([], dtype=np.float32)
-    
+        return []
+
     try:
-        # Load the scene.
-        # strict=True raises errors for bad parsing
-        # encoding='iso-8859-1' is often safer for OBJs than utf-8
+        # Load the scene. PyWavefront automatically parses the associated .mtl file
         scene = pywavefront.Wavefront(
             file_path, 
             collect_faces=True, 
-            create_materials=True,
-            strict=False 
+            create_materials=True, 
+            strict=False
         )
         
-        all_vertices = []
+        model_parts = []
 
-        # PyWavefront groups geometry by Material. 
-        # We need to iterate over materials to get all parts of the mesh.
+        # Iterate over each material found in the OBJ
         for name, material in scene.materials.items():
             
-            # This is the magic part: visualization.format_material forces the data
-            # into a format OpenGL understands directly.
-            # 'T2F_V3F' means: Texture (2 floats) then Vertex (3 floats) -> [u, v, x, y, z]
-            # WAIT: Your engine expects [x, y, z, u, v].
-            # PyWavefront usually outputs T2F_V3F (u, v, x, y, z) or C3F_V3F.
-            
-            # Let's get the raw format and verify. 
-            # PyWavefront's default interleaved format is usually T2F_V3F.
-            
-            # We enforce a specific format using this helper:
-            # This aligns the vertices to be compatible with standard GL pipelines.
-            # format_material returns indices too, but since you use glDrawArrays, 
-            # we might just want the raw flattened vertex data (unindexed).
-            
-            # However, simpler approach for your specific Mesh class:
-            # Accessing material.vertices gives a flat list of floats.
-            # The format is defined in material.vertex_format.
-            
-            # Check format
+            # --- 1. Extract Texture Path ---
+            texture_path = None
+            # PyWavefront stores the texture object in material.texture
+            # We look for the diffuse texture (map_Kd)
+            if material.texture:
+                texture_path = material.texture.path
+                # Sometimes the path is absolute or relative. We keep it as is for now.
+
+            # --- 2. Extract Vertices (Same logic as before) ---
             format_str = material.vertex_format
             data = material.vertices
-            
-            # PyWavefront is a bit tricky: it often outputs [u, v, x, y, z].
-            # Your engine wants [x, y, z, u, v].
-            # We need to detect and swap if necessary, or change your Mesh class stride.
-            
-            # Let's convert to numpy to manipulate easily
             data_np = np.array(data, dtype=np.float32)
             
+            vertices_flat = np.array([], dtype=np.float32)
+
             if format_str == 'T2F_V3F':
-                # Data is: u, v, x, y, z, u, v, x, y, z...
-                # Reshape to (N, 5)
                 count = len(data_np) // 5
                 reshaped = data_np.reshape((count, 5))
-                
-                # Swap columns to get [x, y, z, u, v]
-                # Current: 0=u, 1=v, 2=x, 3=y, 4=z
-                # Target:  x, y, z, u, v
-                
-                # Create a new array with correct order
-                # columns: 2,3,4 (xyz) then 0,1 (uv)
+                # Swap columns: XYZ (2,3,4) then UV (0,1)
                 corrected = reshaped[:, [2, 3, 4, 0, 1]]
-                
-                all_vertices.extend(corrected.flatten())
+                vertices_flat = corrected.flatten()
                 
             elif format_str == 'V3F':
-                # Just position, no texture. 
-                # We need to pad with dummy UVs [x, y, z, 0, 0]
                 count = len(data_np) // 3
                 reshaped = data_np.reshape((count, 3))
-                
-                # Add two columns of zeros
                 zeros = np.zeros((count, 2), dtype=np.float32)
-                combined = np.hstack((reshaped, zeros))
-                
-                all_vertices.extend(combined.flatten())
-                
-            else:
-                # Fallback or other formats (N3F_V3F etc)
-                # For now, let's assume standard textured OBJ
-                Logger.warning(f"Unknown vertex format from PyWavefront: {format_str}")
-                pass
+                vertices_flat = np.hstack((reshaped, zeros)).flatten()
 
-        Logger.info(f"Loaded OBJ (PyWavefront): {file_path} - Vertices: {len(all_vertices)//5}")
-        return np.array(all_vertices, dtype=np.float32)
+            elif format_str == 'N3F_V3F':
+                 count = len(data_np) // 6
+                 reshaped = data_np.reshape((count, 6))
+                 positions = reshaped[:, 3:6]
+                 zeros = np.zeros((count, 2), dtype=np.float32)
+                 vertices_flat = np.hstack((positions, zeros)).flatten()
+            
+            elif 'T2F' in format_str and 'N3F' in format_str and 'V3F' in format_str:
+                 # Assuming 8 floats (T2F_N3F_V3F)
+                 count = len(data_np) // 8
+                 reshaped = data_np.reshape((count, 8))
+                 # Indices: 0,1=UV | 2,3,4=Norm | 5,6,7=Pos -> Keep Pos + UV
+                 corrected = reshaped[:, [5, 6, 7, 0, 1]]
+                 vertices_flat = corrected.flatten()
+
+            # Only add part if it has vertices
+            if len(vertices_flat) > 0:
+                model_parts.append({
+                    "name": name,
+                    "vertices": vertices_flat,
+                    "texture_path": texture_path
+                })
+
+        Logger.info(f"Loaded OBJ: {file_path} with {len(model_parts)} parts.")
+        return model_parts
 
     except Exception as e:
         Logger.error(f"Failed to load OBJ {file_path}: {e}")
-        return np.array([], dtype=np.float32)
+        return []
     

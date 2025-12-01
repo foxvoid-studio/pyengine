@@ -1,3 +1,5 @@
+mtllib pyramid.mtl
+
 # Pyramide simple
 # v = Vertices (Sommets: x y z)
 v  0.0  0.5  0.0
@@ -12,6 +14,8 @@ vt 1.0 0.0
 vt 0.5 1.0
 vt 1.0 1.0
 vt 0.0 1.0
+
+usemtl PyramidMat
 
 # f = Faces (Indices: v/vt)
 # Note: Les indices commencent à 1 en OBJ
