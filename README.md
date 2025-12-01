@@ -23,6 +23,8 @@ Unlike frameworks like PyGame (which often relies on legacy rendering) or Kivy (
 
   - 🧮 Robust Math: Powered by PyGLM for C++ equivalent matrix and vector performance.
 
+---
+
 ## 📦 Installation
 
 Ensure you have Python 3.10+ installed.
@@ -40,6 +42,8 @@ Install dependencies:
 ```
 poetry install
 ```
+
+---
 
 ## 🚀 Quick Start
 
@@ -59,8 +63,9 @@ if __name__ == "__main__":
     app.run()
 ```
 
+---
 
-🏗️ Architecture
+## 🏗️ Architecture
 
 PyEngine follows a strict layered architecture to maintain performance and readability.
 
@@ -70,6 +75,8 @@ PyEngine follows a strict layered architecture to maintain performance and reada
 | Rendering | PyOpenGL | Direct bindings to OpenGL 3.3 Core Profile. |
 | Maths | PyGLM | Fast matrix/vector operations (GLSL compatible). |
 | Logic | ECS | Custom Entity Component System for managing game state. |
+
+---
 
 ## 🤝 Contributing
 
@@ -84,6 +91,8 @@ Commit your changes (git commit -m 'Add some AmazingFeature')
 Push to the branch (git push origin feature/AmazingFeature)
 
 Open a Pull Request
+
+---
 
 ## 📄 License
 
