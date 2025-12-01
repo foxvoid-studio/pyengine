@@ -1,3 +1,4 @@
+import math
 import numpy as np
 from OpenGL.GL import *
 from pyengine.gl_utils.shader import ShaderProgram
@@ -157,3 +158,132 @@ class Cube(Mesh):
         ], dtype=np.float32)
 
         super().__init__(shader, vertices)
+
+
+class Plane(Mesh):
+    """
+    A flat plane on the XZ axis (Ground).
+    Useful for floors.
+    """
+    def __init__(self, shader: ShaderProgram, width: float = 10.0, depth: float = 10.0, tile_u: float = 1.0, tile_v: float = 1.0):
+        w = width / 2.0
+        d = depth / 2.0
+        
+        # Vertices (X, Y, Z, U, V)
+        # Y is 0.0 because it's a ground plane
+        vertices = np.array([
+            # First Triangle
+            -w, 0.0,  d,  0.0,    0.0,
+             w, 0.0,  d,  tile_u, 0.0,
+            -w, 0.0, -d,  0.0,    tile_v,
+
+            # Second Triangle
+             w, 0.0,  d,  tile_u, 0.0,
+             w, 0.0, -d,  tile_u, tile_v,
+            -w, 0.0, -d,  0.0,    tile_v
+        ], dtype=np.float32)
+
+        super().__init__(shader, vertices)
+
+
+class Sphere(Mesh):
+    """
+    A procedural Sphere generated using spherical coordinates.
+    """
+    def __init__(self, shader: ShaderProgram, radius: float = 0.5, sectors: int = 36, stacks: int = 18):
+        vertices = []
+        
+        # Helper to get position on sphere surface
+        def get_pos(stack_idx, sector_idx):
+            # Math logic:
+            # stack angle goes from -pi/2 to pi/2 (bottom to top)
+            # sector angle goes from 0 to 2pi (around the circle)
+            stack_angle = math.pi / 2 - stack_idx * math.pi / stacks
+            sector_angle = sector_idx * 2 * math.pi / sectors
+            
+            x = radius * math.cos(stack_angle) * math.cos(sector_angle)
+            y = radius * math.sin(stack_angle)
+            z = radius * math.cos(stack_angle) * math.sin(sector_angle)
+            
+            u = sector_idx / sectors
+            v = stack_idx / stacks
+            return x, y, z, u, v
+
+        # Generate triangles
+        for i in range(stacks):
+            for j in range(sectors):
+                # 4 corners of the current sector "quad"
+                # P1 -- P2
+                # |      |
+                # P3 -- P4
+                
+                x1, y1, z1, u1, v1 = get_pos(i, j)          # Top Left
+                x2, y2, z2, u2, v2 = get_pos(i, j+1)        # Top Right
+                x3, y3, z3, u3, v3 = get_pos(i+1, j)        # Bottom Left
+                x4, y4, z4, u4, v4 = get_pos(i+1, j+1)      # Bottom Right
+                
+                # Triangle 1 (Top Left, Top Right, Bottom Left)
+                vertices.extend([x1, y1, z1, u1, v1])
+                vertices.extend([x2, y2, z2, u2, v2])
+                vertices.extend([x3, y3, z3, u3, v3])
+                
+                # Triangle 2 (Top Right, Bottom Right, Bottom Left)
+                vertices.extend([x2, y2, z2, u2, v2])
+                vertices.extend([x4, y4, z4, u4, v4])
+                vertices.extend([x3, y3, z3, u3, v3])
+
+        super().__init__(shader, np.array(vertices, dtype=np.float32))
+
+
+class Cylinder(Mesh):
+    """
+    A procedural Cylinder with top and bottom caps.
+    """
+    def __init__(self, shader: ShaderProgram, radius: float = 0.5, height: float = 1.0, segments: int = 32):
+        vertices = []
+        half_h = height / 2.0
+        
+        for i in range(segments):
+            # Calculate angles
+            theta = 2.0 * math.pi * i / segments
+            next_theta = 2.0 * math.pi * (i + 1) / segments
+            
+            # Precompute sin/cos for current and next segment
+            c, s = math.cos(theta), math.sin(theta)
+            nc, ns = math.cos(next_theta), math.sin(next_theta)
+            
+            # --- SIDE WALLS ---
+            # UV mapping wraps around the cylinder
+            u = i / segments
+            nu = (i + 1) / segments
+            
+            # Top-Left, Top-Right, Bot-Left, Bot-Right logic
+            p1 = (radius * c,  half_h, radius * s,  u, 1.0)
+            p2 = (radius * nc, half_h, radius * ns, nu, 1.0)
+            p3 = (radius * c, -half_h, radius * s,  u, 0.0)
+            p4 = (radius * nc,-half_h, radius * ns, nu, 0.0)
+            
+            # Add two triangles for the side face
+            vertices.extend(p1 + p2 + p3)
+            vertices.extend(p2 + p4 + p3)
+            
+            # --- TOP CAP ---
+            # Center point, Current Rim, Next Rim
+            # UVs for caps are mapped like a circle in a square
+            
+            # Center Top
+            tc = (0.0, half_h, 0.0, 0.5, 0.5) 
+            # Rim points with UVs adjusted to be centered
+            tr1 = (radius * c,  half_h, radius * s,  0.5 + 0.5*c, 0.5 + 0.5*s)
+            tr2 = (radius * nc, half_h, radius * ns, 0.5 + 0.5*nc, 0.5 + 0.5*ns)
+            
+            vertices.extend(tc + tr2 + tr1) # Winding order matters!
+            
+            # --- BOTTOM CAP ---
+            bc = (0.0, -half_h, 0.0, 0.5, 0.5)
+            br1 = (radius * c,  -half_h, radius * s,  0.5 + 0.5*c, 0.5 + 0.5*s)
+            br2 = (radius * nc, -half_h, radius * ns, 0.5 + 0.5*nc, 0.5 + 0.5*ns)
+            
+            vertices.extend(bc + br1 + br2)
+
+        super().__init__(shader, np.array(vertices, dtype=np.float32))

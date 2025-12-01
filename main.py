@@ -1,6 +1,6 @@
 from sdl2 import SDL_SetRelativeMouseMode, SDL_TRUE
 from pyengine.core.app import App
-from pyengine.gl_utils.mesh import Rectangle, Cube
+from pyengine.gl_utils.mesh import Cylinder, Plane, Rectangle, Cube, Sphere
 from pyengine.graphics.camera import Camera2D, Camera3D, MainCamera
 from pyengine.graphics.material import Material
 from pyengine.graphics.mesh_renderer import MeshRenderer
@@ -39,26 +39,48 @@ class Game2D(App):
 class Game3D(App):
     def startup(self):
         super().startup()
-
+        
         SDL_SetRelativeMouseMode(SDL_TRUE)
 
-        # 1. Load Shader
+        # 1. Load Resources
         shader = self.resources.get_shader("shaders/mesh.vert", "shaders/mesh.frag")
+        
+        # Load textures
+        tex_logo = self.resources.get_texture("assets/logo.png")
+        
+        mat_object = Material(shader, tex_logo)
 
+        # 2. Camera
         self.camera_entity = self.entity_manager.create_entity()
-        self.entity_manager.add_component(self.camera_entity, Transform(position=(0, 0, 3)))
-        self.entity_manager.add_component(self.camera_entity, Camera3D(self.width, self.height, fov=90.0))
+        self.entity_manager.add_component(self.camera_entity, Transform(position=(0, 1, 3)))
+        self.entity_manager.add_component(self.camera_entity, Camera3D(self.width, self.height, fov=70.0))
         self.entity_manager.add_component(self.camera_entity, MainCamera())
 
-        logo_texture = self.resources.get_texture("assets/logo.png")
-        logo_mat = Material(shader, logo_texture)
+        # 3. Create Scene
+        
+        # --- FLOOR ---
+        plane_geo = Plane(shader, width=20, depth=20, tile_u=5, tile_v=5)
+        floor = self.entity_manager.create_entity()
+        self.entity_manager.add_component(floor, Transform(position=(0, 0, 0)))
+        self.entity_manager.add_component(floor, MeshRenderer(plane_geo, mat_object))
 
+        # --- SPHERE ---
+        sphere_geo = Sphere(shader, radius=0.5, sectors=32, stacks=16)
+        sphere = self.entity_manager.create_entity()
+        self.entity_manager.add_component(sphere, Transform(position=(-1.5, 0.5, 0))) # Lift y by 0.5 (radius) to sit on floor
+        self.entity_manager.add_component(sphere, MeshRenderer(sphere_geo, mat_object))
+
+        # --- CYLINDER ---
+        cyl_geo = Cylinder(shader, radius=0.5, height=1.5)
+        cylinder = self.entity_manager.create_entity()
+        self.entity_manager.add_component(cylinder, Transform(position=(1.5, 0.75, 0))) # Lift y by half height
+        self.entity_manager.add_component(cylinder, MeshRenderer(cyl_geo, mat_object))
+
+        # --- CUBE (Middle) ---
         cube_geo = Cube(shader)
-        cube_entity = self.entity_manager.create_entity()
-
-        # Rotate it a bit so we see it's 3D
-        self.entity_manager.add_component(cube_entity, Transform(position=(0, 0, 0)))
-        self.entity_manager.add_component(cube_entity, MeshRenderer(cube_geo, logo_mat))
+        cube = self.entity_manager.create_entity()
+        self.entity_manager.add_component(cube, Transform(position=(0, 0.5, 0)))
+        self.entity_manager.add_component(cube, MeshRenderer(cube_geo, mat_object))
 
 
 if __name__ == "__main__":

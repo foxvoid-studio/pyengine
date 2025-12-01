@@ -186,9 +186,9 @@ class App:
             
             # Mouvements Plan (X, Y)
             cam_speed = 5.0 * dt
-            if self.input.is_key_down(SDLK_w): cam_transform.position.y += cam_speed
+            if self.input.is_key_down(SDLK_z): cam_transform.position.y += cam_speed
             if self.input.is_key_down(SDLK_s): cam_transform.position.y -= cam_speed
-            if self.input.is_key_down(SDLK_a): cam_transform.position.x -= cam_speed
+            if self.input.is_key_down(SDLK_q): cam_transform.position.x -= cam_speed
             if self.input.is_key_down(SDLK_d): cam_transform.position.x += cam_speed
 
         # --- LOGIQUE 3D ---
@@ -205,11 +205,11 @@ class App:
             # On bouge par rapport à la direction de la caméra (front/right)
             move_speed = 5.0 * dt
             
-            if self.input.is_key_down(SDLK_w):
+            if self.input.is_key_down(SDLK_z):
                 cam_transform.position += cam_3d.front * move_speed
             if self.input.is_key_down(SDLK_s):
                 cam_transform.position -= cam_3d.front * move_speed
-            if self.input.is_key_down(SDLK_a):
+            if self.input.is_key_down(SDLK_q):
                 cam_transform.position -= cam_3d.right * move_speed
             if self.input.is_key_down(SDLK_d):
                 cam_transform.position += cam_3d.right * move_speed
