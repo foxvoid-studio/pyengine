@@ -9,6 +9,7 @@ from pyengine.physics.transform import Transform
 from pyengine.graphics.mesh_renderer import MeshRenderer
 from pyengine.ecs.entity_manager import EntityManager
 from pyengine.graphics.render_system import RenderSystem
+from pyengine.core.input_manager import InputManager
 
 
 # =============================================================================
@@ -26,6 +27,7 @@ class App:
         self.running = False
         self._init_sdl()
         
+        self.input = InputManager()
         self.entity_manager = EntityManager()
         self.render_system = RenderSystem()
         
@@ -89,7 +91,7 @@ class App:
 
         # Entity 2: Rectangle
         e2 = self.entity_manager.create_entity()
-        self.entity_manager.add_component(e2, Transform(position=(-0.6, 0, 0), scale=(0.3, 0.3, 1)))
+        self.entity_manager.add_component(e2, Transform(position=(-0.6, 0, 0), scale=(0.7, 0.7, 1)))
         self.entity_manager.add_component(e2, MeshRenderer(rect_geo, self.shader, logo_texture))
 
         # Entity 3: Ground
@@ -105,6 +107,9 @@ class App:
 
         # Poll all pending events
         while SDL_PollEvent(ctypes.byref(event)) != 0:
+            # Let the InputManager see the event first
+            self.input.process_event(event)
+
             if event.type == SDL_QUIT:
                 self.running = False
 
@@ -113,10 +118,6 @@ class App:
                     # Update viewport when window is resized
                     glViewport(0, 0, event.window.data1, event.window.data2)
 
-            elif event.type == SDL_KEYDOWN:
-                if event.key.keysym.sym == SDLK_ESCAPE:
-                    self.running = False
-
     def run(self) -> None:
         """
         The main application loop.
@@ -124,8 +125,15 @@ class App:
         self.running = True
         
         while self.running:
-            # Handle input/events
+            # 1. Prepare Input Manager for the new frame (clear "just pressed" flags)
+            self.input.update()
+
+            # 2. Handle input/events (fills Input Manager with new data)
             self.process_events()
+
+            # 3. Game Logic using InputManager
+            if self.input.is_key_pressed(SDLK_ESCAPE):
+                self.running = False
             
             for entity, (transform,) in self.entity_manager.get_entities_with(Transform):
                 if entity == 0:
