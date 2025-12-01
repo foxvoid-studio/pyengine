@@ -4,6 +4,7 @@ from sdl2 import *
 from OpenGL.GL import *
 from pyengine.gl_utils.shader import ShaderProgram
 from pyengine.gl_utils.mesh import Triangle, Rectangle
+from pyengine.gl_utils.texture import Texture
 from pyengine.physics.transform import Transform
 from pyengine.graphics.mesh_renderer import MeshRenderer
 from pyengine.ecs.entity_manager import EntityManager
@@ -75,6 +76,8 @@ class App:
         # 1. Load Shader
         self.shader = ShaderProgram.from_files("shaders/mesh.vert", "shaders/mesh.frag")
 
+        logo_texture = Texture("assets/logo.png")
+
         tri_geo = Triangle(self.shader)
         rect_geo = Rectangle(self.shader)
         self.meshes.extend([tri_geo, rect_geo])
@@ -82,17 +85,17 @@ class App:
         # Entity 1: Rotating Triangle
         e1 = self.entity_manager.create_entity()
         self.entity_manager.add_component(e1, Transform(position=(0,0,0), scale=(0.5, 0.5, 1)))
-        self.entity_manager.add_component(e1, MeshRenderer(tri_geo, self.shader))
+        self.entity_manager.add_component(e1, MeshRenderer(tri_geo, self.shader, logo_texture))
 
-        # Entity 2: Rectangle (Rotated 45 degrees = ~0.785 rad)
+        # Entity 2: Rectangle
         e2 = self.entity_manager.create_entity()
-        self.entity_manager.add_component(e2, Transform(position=(-0.6, 0, 0), rotation=(0,0, 0.785), scale=(0.3, 0.3, 1)))
-        self.entity_manager.add_component(e2, MeshRenderer(rect_geo, self.shader))
+        self.entity_manager.add_component(e2, Transform(position=(-0.6, 0, 0), scale=(0.3, 0.3, 1)))
+        self.entity_manager.add_component(e2, MeshRenderer(rect_geo, self.shader, logo_texture))
 
         # Entity 3: Ground
         e3 = self.entity_manager.create_entity()
         self.entity_manager.add_component(e3, Transform(position=(0.6, -0.5, 0), scale=(0.8, 0.1, 1)))
-        self.entity_manager.add_component(e3, MeshRenderer(rect_geo, self.shader))
+        self.entity_manager.add_component(e3, MeshRenderer(rect_geo, self.shader, logo_texture))
 
     def process_events(self) -> None:
         """

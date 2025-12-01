@@ -16,8 +16,8 @@ class Mesh:
         :param shader: The ShaderProgram used to determine attribute locations.
         :param vertices: A numpy array of float32 containing vertex positions (x, y, z).
         """
-        # Calculate vertex count based on array size (assuming 3 floats per vertex: x, y, z)
-        self.count = len(vertices) // 3
+        # We assume vertices are [x, y, z, u, v] -> 5 floats per vertex
+        self.count = len(vertices) // 5
 
         # Create the VBO (Data)
         self.vbo = VertexBuffer(vertices)
@@ -25,14 +25,18 @@ class Mesh:
         # Create the VAO (Configuration)
         self.vao = VertexArray()
 
-        # Automatically configure the VAO based on the Shader's 'a_position' input
+        # Calculate stride: 5 floats * 4 bytes/float = 20 bytes
+        stride = 5 * 4 
+
+        # Position attribute (3 floats, offset 0)
         pos_loc = shader.get_attrib_location("a_position")
-
-        if pos_loc == -1:
-            print("Warning: 'a_position' not found in shader. Mesh might not draw correctly.")
-
-        # Link VBO to VAO
-        self.vao.add_attribute(self.vbo, pos_loc, count=3)
+        if pos_loc != -1:
+            self.vao.add_attribute(self.vbo, pos_loc, 3, stride, 0)
+            
+        # Texture Coordinate attribute (2 floats, offset 3 * 4 = 12 bytes)
+        tex_loc = shader.get_attrib_location("a_texcoord")
+        if tex_loc != -1:
+            self.vao.add_attribute(self.vbo, tex_loc, 2, stride, 12)
 
     def bind(self) -> None:
         self.vao.bind()
@@ -62,9 +66,9 @@ class Triangle(Mesh):
         # Calculate vertices relative to the center (x, y)
         # Using numpy float32 directly for performance and OpenGL compatibility
         vertices = np.array([
-            -0.5, -0.5, 0.0,  # Bottom Left
-             0.5, -0.5, 0.0,  # Bottom Right
-             0.0, 0.5, 0.0    # Top Center
+            -0.5, -0.5, 0.0,   0.0, 0.0,  # Bottom Left
+             0.5, -0.5, 0.0,   1.0, 0.0,  # Bottom Right
+             0.0, 0.5, 0.0,    0.5, 1.0   # Top Center
         ], dtype=np.float32)
 
         # Call the parent constructor (Mesh) with the generated data
@@ -88,14 +92,14 @@ class Rectangle(Mesh):
         # Triangle 2: Bottom-Right, Top-Right, Top-Left
         vertices = np.array([
             # First Triangle
-            -0.5, -0.5, 0.0,  # Bottom Left  
-             0.5, -0.5, 0.0,  # Bottom Right
-            -0.5, 0.5, 0.0,   # Top Left
+            -0.5, -0.5, 0.0,   0.0, 0.0,  # Bottom Left  
+             0.5, -0.5, 0.0,   1.0, 0.0,  # Bottom Right
+            -0.5, 0.5, 0.0,    0.0, 1.0,  # Top Left
 
             # Second Triangle
-             0.5, -0.5, 0.0,  # Bottom Right
-             0.5,  0.5, 0.0,  # Top Right
-            -0.5, 0.5, 0.0    # Top Left
+             0.5, -0.5, 0.0,   1.0, 0.0,  # Bottom Right
+             0.5,  0.5, 0.0,   1.0, 1.0,  # Top Right
+            -0.5, 0.5, 0.0,    0.0, 1.0  # Top Left
         ], dtype=np.float32)
 
         super().__init__(shader, vertices)

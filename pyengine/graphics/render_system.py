@@ -15,18 +15,26 @@ class RenderSystem:
         for _, (transform, renderer) in entity_manager.get_entities_with(Transform, MeshRenderer):
             renderer.shader.use()
 
-            # 1. Identity Matrix
+            # 1. Texture Binding
+            if renderer.texture:
+                renderer.texture.bind(0) # Bind to slot 0
+                # Tell shader that 'u_texture' is at slot 0
+                # (You only strictly need to do this once per shader, but safe here)
+                loc = glGetUniformLocation(renderer.shader.id, "u_texture")
+                glUniform1i(loc, 0)
+
+            # 2. Identity Matrix
             model = glm.mat4(1.0) 
             
-            # 2. Translation
+            # 3. Translation
             model = glm.translate(model, transform.position)
             
-            # 3. Rotation
+            # 4. Rotation
             # We rotate around Z axis for 2D. 
             # (Note: GLM uses Radians. If you input degrees, use glm.radians(deg))
             model = glm.rotate(model, transform.rotation.z, glm.vec3(0, 0, 1))
             
-            # 4. Scale
+            # 5. Scale
             model = glm.scale(model, transform.scale)
             
             # --- SEND TO GPU ---
