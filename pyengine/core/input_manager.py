@@ -17,6 +17,7 @@ class InputManager:
         # Mouse state
         self._mouse_x = 0
         self._mouse_y = 0
+        self._mouse_wheel_y = 0
         self._mouse_buttons = {}
         self._mouse_buttons_pressed_this_frame = set()
 
@@ -28,6 +29,7 @@ class InputManager:
         self._keys_pressed_this_frame.clear()
         self._keys_released_this_frame.clear()
         self._mouse_buttons_pressed_this_frame.clear()
+        self._mouse_wheel_y = 0
 
     def process_event(self, event) -> None:
         """
@@ -63,6 +65,11 @@ class InputManager:
             button = event.button.button
             self._mouse_buttons[button] = False
 
+        elif event.type == SDL_MOUSEWHEEL:
+            # event.wheel.y est positif si on pousse la molette (Zoom In)
+            # et négatif si on la tire vers soi (Zoom Out)
+            self._mouse_wheel_y = event.wheel.y
+
     # --- Queries ---
 
     def is_key_down(self, key_code) -> bool:
@@ -84,4 +91,8 @@ class InputManager:
     def is_mouse_button_down(self, button_code) -> bool:
         """Returns True if the mouse button is held down (e.g., SDL_BUTTON_LEFT)."""
         return self._mouse_buttons.get(button_code, False)
+    
+    def get_mouse_wheel(self) -> int:
+        """Returns the vertical scroll amount for this frame."""
+        return self._mouse_wheel_y
     

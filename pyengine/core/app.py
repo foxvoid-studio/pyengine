@@ -12,6 +12,7 @@ from pyengine.graphics.render_system import RenderSystem
 from pyengine.core.input_manager import InputManager
 from pyengine.core.time_manager import TimeManager
 from pyengine.graphics.material import Material
+from pyengine.graphics.camera import Camera2D, MainCamera
 
 
 # =============================================================================
@@ -33,6 +34,8 @@ class App:
         self.time = TimeManager()
         self.entity_manager = EntityManager()
         self.render_system = RenderSystem()
+
+        self.camera_entity = None
         
         self.shader = None
         self.meshes = [] 
@@ -89,7 +92,12 @@ class App:
 
         mat_logo = Material(self.shader, texture=logo_texture)
         mat_red_logo = Material(self.shader, texture=logo_texture, color=(1.0, 0.0, 0.0, 1.0))
-        mat_green_logo = Material(self.shader, texture=logo_texture, color=(0.0, 1.0, 0.0, 1.0))   
+        mat_green_logo = Material(self.shader, texture=logo_texture, color=(0.0, 1.0, 0.0, 1.0))
+
+        self.camera_entity = self.entity_manager.create_entity()
+        self.entity_manager.add_component(self.camera_entity, Transform())
+        self.entity_manager.add_component(self.camera_entity, Camera2D(self.width, self.height, ortho_size=5.0))
+        self.entity_manager.add_component(self.camera_entity, MainCamera())
 
         # Entity 1: Rotating Triangle
         e1 = self.entity_manager.create_entity()
@@ -122,8 +130,15 @@ class App:
 
             elif event.type == SDL_WINDOWEVENT:
                 if event.window.event == SDL_WINDOWEVENT_RESIZED:
+                    new_w, new_h = event.window.data1, event.window.data2
+
                     # Update viewport when window is resized
-                    glViewport(0, 0, event.window.data1, event.window.data2)
+                    glViewport(0, 0, new_w, new_h)
+
+                    # Retrieve Camera component to update aspect ratio
+                    cam_comp = self.entity_manager.get_component(self.camera_entity, Camera2D)
+                    if cam_comp:
+                        cam_comp.resize(new_w, new_h)
 
     def set_title(self, title: str) -> None:
         SDL_SetWindowTitle(self.window, title.encode())
@@ -144,13 +159,7 @@ class App:
             # 3. Handle input/events (fills Input Manager with new data)
             self.process_events()
 
-            # 4. Game Logic using InputManager
-            if self.input.is_key_pressed(SDLK_ESCAPE):
-                self.running = False
-            
-            for entity, (transform,) in self.entity_manager.get_entities_with(Transform):
-                if entity == 0:
-                    transform.rotation.z += 1.0 * self.time.delta_time
+            self.temp_game_logic()
             
             # (Optional but here for debug) Update window title with FPS
             self.set_title(f"{self.title.decode()} - FPS: {self.time.fps}")
@@ -180,3 +189,39 @@ class App:
         SDL_GL_DeleteContext(self.context)
         SDL_DestroyWindow(self.window)
         SDL_Quit()
+
+    def temp_game_logic(self):
+        if self.input.is_key_pressed(SDLK_ESCAPE):
+            self.running = False
+            
+        for entity, (transform,) in self.entity_manager.get_entities_with(Transform):
+            if entity == 1:
+                transform.rotation.z += 1.0 * self.time.delta_time
+
+        # Retrieve components for the camera entity
+        cam_transform = self.entity_manager.get_component(self.camera_entity, Transform)
+        cam_comp = self.entity_manager.get_component(self.camera_entity, Camera2D)
+
+        if cam_transform and cam_comp:
+            dt = self.time.delta_time
+            scroll = self.input.get_mouse_wheel()
+
+            if scroll != 0:
+                zoom_amount = scroll * 0.5
+                self.camera_entity.zoom += zoom_amount
+
+                # SÉCURITÉ : Empêcher le zoom d'être négatif ou nul
+                if self.camera_entity.zoom < 0.1:
+                    self.camera_entity.zoom = 0.1
+
+            cam_speed = 5.0 * dt
+
+            # WASD to move Camera
+            if self.input.is_key_down(SDLK_w):
+                cam_transform.position.y += cam_speed
+            if self.input.is_key_down(SDLK_s):
+                cam_transform.position.y -= cam_speed
+            if self.input.is_key_down(SDLK_a):
+                cam_transform.position.x -= cam_speed
+            if self.input.is_key_down(SDLK_d):
+                cam_transform.position.x += cam_speed

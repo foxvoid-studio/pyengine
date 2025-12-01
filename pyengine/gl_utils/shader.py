@@ -67,7 +67,7 @@ class ShaderProgram:
         """Deactivates the current shader program."""
         glUseProgram(0)
 
-    def get_attrib_location(self, attrib_name) -> int:
+    def get_attrib_location(self, attrib_name: str) -> int:
         """
         Retrieves the location ID of a specific attribute variable (e.g., 'a_position')
         from the compiled shader program.
