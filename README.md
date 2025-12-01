@@ -73,6 +73,7 @@ PyEngine follows a strict layered architecture to maintain performance and reada
 | :--- | :--- | :--- |
 | Windowing | pysdl2 | Cross-platform window creation, input handling, and context management. |
 | Rendering | PyOpenGL | Direct bindings to OpenGL 3.3 Core Profile. |
+| Rendering | Pillow | Image loading and processing for textures. |
 | Maths | PyGLM | Fast matrix/vector operations (GLSL compatible). |
 | Logic | ECS | Custom Entity Component System for managing game state. |
 
