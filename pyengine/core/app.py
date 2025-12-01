@@ -12,7 +12,7 @@ from pyengine.core.input_manager import InputManager
 from pyengine.core.time_manager import TimeManager
 from pyengine.core.resource_manager import ResourceManager
 from pyengine.graphics.material import Material
-from pyengine.graphics.camera import Camera2D, MainCamera
+from pyengine.graphics.camera import Camera2D, Camera3D, MainCamera
 from pyengine.graphics.sprite import SpriteSheet, Animator, Animation
 from pyengine.graphics.animation_system import AnimationSystem
 
@@ -62,6 +62,8 @@ class App:
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3)
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3)
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE)
+
+        SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24)
 
         # Create the window with the OpenGL support flag
         self.window = SDL_CreateWindow(
@@ -167,30 +169,53 @@ class App:
         if self.input.is_key_pressed(SDLK_ESCAPE):
             self.running = False
 
-        # Retrieve components for the camera entity
+        dt = self.time.delta_time
         cam_transform = self.entity_manager.get_component(self.camera_entity, Transform)
-        cam_comp = self.entity_manager.get_component(self.camera_entity, Camera2D)
 
-        if cam_transform and cam_comp:
-            dt = self.time.delta_time
+        # Essayons de récupérer les deux types de caméra
+        cam_2d = self.entity_manager.get_component(self.camera_entity, Camera2D)
+        cam_3d = self.entity_manager.get_component(self.camera_entity, Camera3D)
+
+        # --- LOGIQUE 2D ---
+        if cam_transform and cam_2d:
+            # Zoom Molette
             scroll = self.input.get_mouse_wheel()
-
             if scroll != 0:
-                zoom_amount = scroll * 0.5
-                cam_comp.zoom += zoom_amount
-
-                # SÉCURITÉ : Empêcher le zoom d'être négatif ou nul
-                if cam_comp.zoom < 0.1:
-                    cam_comp.zoom = 0.1
-
+                cam_2d.zoom += scroll * 0.5
+                if cam_2d.zoom < 0.1: cam_2d.zoom = 0.1
+            
+            # Mouvements Plan (X, Y)
             cam_speed = 5.0 * dt
+            if self.input.is_key_down(SDLK_w): cam_transform.position.y += cam_speed
+            if self.input.is_key_down(SDLK_s): cam_transform.position.y -= cam_speed
+            if self.input.is_key_down(SDLK_a): cam_transform.position.x -= cam_speed
+            if self.input.is_key_down(SDLK_d): cam_transform.position.x += cam_speed
 
-            # WASD to move Camera
+        # --- LOGIQUE 3D ---
+        elif cam_transform and cam_3d:
+            # Mode FPS : La souris contrôle le regard
+            # Nécessite: SDL_SetRelativeMouseMode(SDL_TRUE) dans le startup de Game3D
+            
+            # 1. Gestion de la souris (Look)
+            x_rel, y_rel = ctypes.c_int(0), ctypes.c_int(0)
+            SDL_GetRelativeMouseState(ctypes.byref(x_rel), ctypes.byref(y_rel))
+            cam_3d.process_mouse_movement(x_rel.value, -y_rel.value)
+
+            # 2. Gestion du Clavier (Move)
+            # On bouge par rapport à la direction de la caméra (front/right)
+            move_speed = 5.0 * dt
+            
             if self.input.is_key_down(SDLK_w):
-                cam_transform.position.y += cam_speed
+                cam_transform.position += cam_3d.front * move_speed
             if self.input.is_key_down(SDLK_s):
-                cam_transform.position.y -= cam_speed
+                cam_transform.position -= cam_3d.front * move_speed
             if self.input.is_key_down(SDLK_a):
-                cam_transform.position.x -= cam_speed
+                cam_transform.position -= cam_3d.right * move_speed
             if self.input.is_key_down(SDLK_d):
-                cam_transform.position.x += cam_speed
+                cam_transform.position += cam_3d.right * move_speed
+            
+            # Optionnel : Monter/Descendre avec Space/Shift
+            if self.input.is_key_down(SDLK_SPACE):
+                cam_transform.position.y += move_speed
+            if self.input.is_key_down(SDLK_LSHIFT):
+                cam_transform.position.y -= move_speed

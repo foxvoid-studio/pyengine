@@ -4,7 +4,7 @@ from pyengine.core.logger import Logger
 from pyengine.ecs.entity_manager import EntityManager
 from pyengine.physics.transform import Transform
 from pyengine.graphics.mesh_renderer import MeshRenderer
-from pyengine.graphics.camera import Camera2D, MainCamera
+from pyengine.graphics.camera import Camera2D, Camera3D, MainCamera
 from pyengine.graphics.material import Material
 from pyengine.graphics.sprite import SpriteSheet
 
@@ -27,27 +27,48 @@ class RenderSystem:
             glBindTexture(GL_TEXTURE_2D, 0)
 
     def update(self, entity_manager: EntityManager):
-        # 1. Find the Main Camera entity
+        glClearColor(0.1, 0.1, 0.2, 1.0)
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+
+        # 1. Find Main Camera (Generic search)
         camera_component = None
         camera_transform = None
+        is_3d_mode = False
 
-        # We look for entities having ALL three components
-        for _, (cam, trans, _) in entity_manager.get_entities_with(Camera2D, Transform, MainCamera):
-            camera_component = cam
-            camera_transform = trans
-            break # We only need one main camera
+        # Look for entity with MainCamera AND Transform
+        # Note: We check specifically for Camera3D or Camera2D
+        # Or you can just duck-type if you iterate all entities with MainCamera
         
-        # If no main camera is found, we can't render properly (or render default)
+        for entity, (main_cam_tag, transform) in entity_manager.get_entities_with(MainCamera, Transform):
+            # Check if it has 3D or 2D camera
+            c3d = entity_manager.get_component(entity, Camera3D)
+            c2d = entity_manager.get_component(entity, Camera2D)
+            
+            if c3d:
+                camera_component = c3d
+                camera_transform = transform
+                is_3d_mode = True
+                break
+            elif c2d:
+                camera_component = c2d
+                camera_transform = transform
+                is_3d_mode = False
+                break
+        
         if not camera_component:
-            Logger.warning("No MainCamera found in scene!")
+            Logger.warning("No camera found")
             return
-
-        # Pre-calculate Camera Matrices once per frame
+        
+        if is_3d_mode:
+            # 3D: We need Z-Buffer to handle occlusion
+            glEnable(GL_DEPTH_TEST)
+        else:
+            # 2D: We usually disable Z-Buffer so sprites behave like layers 
+            # (or use Z for layering, but disabling is safer for simple 2D)
+            glDisable(GL_DEPTH_TEST)
+        
         view_matrix = camera_component.get_view_matrix(camera_transform)
         proj_matrix = camera_component.get_projection_matrix()
-
-        glClearColor(0.1, 0.1, 0.2, 1.0)
-        glClear(GL_COLOR_BUFFER_BIT)
 
         for entity, (transform, renderer) in entity_manager.get_entities_with(Transform, MeshRenderer):
             
@@ -82,7 +103,15 @@ class RenderSystem:
             # --- 3. Model Matrix ---
             model = glm.mat4(1.0)
             model = glm.translate(model, transform.position)
+
+            # Rotation logic (Handling 3D rotation vs 2D rotation)
+            # transform.rotation is usually a vec3. 
+            # Ideally, transform should handle full Quaternion or Euler XYZ rotation.
+            # For now, applying axes sequentially:
+            model = glm.rotate(model, transform.rotation.x, glm.vec3(1, 0, 0))
+            model = glm.rotate(model, transform.rotation.y, glm.vec3(0, 1, 0))
             model = glm.rotate(model, transform.rotation.z, glm.vec3(0, 0, 1))
+
             model = glm.scale(model, transform.scale)
 
             material.shader.set_uniform_matrix("u_model",model)
