@@ -2,15 +2,14 @@ import sys
 import ctypes
 from sdl2 import *
 from OpenGL.GL import *
-from pyengine.gl_utils.shader import ShaderProgram
 from pyengine.gl_utils.mesh import Triangle, Rectangle
-from pyengine.gl_utils.texture import Texture
 from pyengine.physics.transform import Transform
 from pyengine.graphics.mesh_renderer import MeshRenderer
 from pyengine.ecs.entity_manager import EntityManager
 from pyengine.graphics.render_system import RenderSystem
 from pyengine.core.input_manager import InputManager
 from pyengine.core.time_manager import TimeManager
+from pyengine.core.resource_manager import ResourceManager
 from pyengine.graphics.material import Material
 from pyengine.graphics.camera import Camera2D, MainCamera
 
@@ -32,13 +31,12 @@ class App:
         
         self.input = InputManager()
         self.time = TimeManager()
+        self.resources = ResourceManager()
         self.entity_manager = EntityManager()
         self.render_system = RenderSystem()
 
         self.camera_entity = None
         
-        self.shader = None
-        self.meshes = [] 
         self._init_scene()
 
     def _init_sdl(self) -> None:
@@ -82,17 +80,16 @@ class App:
 
     def _init_scene(self) -> None:
         # 1. Load Shader
-        self.shader = ShaderProgram.from_files("shaders/mesh.vert", "shaders/mesh.frag")
+        shader = self.resources.get_shader("shaders/mesh.vert", "shaders/mesh.frag")
 
-        logo_texture = Texture("assets/logo.png")
+        logo_texture = self.resources.get_texture("assets/logo.png")
 
-        tri_geo = Triangle(self.shader)
-        rect_geo = Rectangle(self.shader)
-        self.meshes.extend([tri_geo, rect_geo])
+        tri_geo = Triangle(shader)
+        rect_geo = Rectangle(shader)
 
-        mat_logo = Material(self.shader, texture=logo_texture)
-        mat_red_logo = Material(self.shader, texture=logo_texture, color=(1.0, 0.0, 0.0, 1.0))
-        mat_green_logo = Material(self.shader, texture=logo_texture, color=(0.0, 1.0, 0.0, 1.0))
+        mat_logo = Material(shader, texture=logo_texture)
+        mat_red_logo = Material(shader, texture=logo_texture, color=(1.0, 0.0, 0.0, 1.0))
+        mat_green_logo = Material(shader, texture=logo_texture, color=(0.0, 1.0, 0.0, 1.0))
 
         self.camera_entity = self.entity_manager.create_entity()
         self.entity_manager.add_component(self.camera_entity, Transform())
@@ -178,13 +175,6 @@ class App:
         Clean up OpenGL resources explicitly before destroying the context.
         This prevents 'sys.meta_path is None' errors during interpreter shutdown.
         """
-        # Loop through meshes and destroy them
-        for mesh in self.meshes:
-            mesh.destroy()
-
-        if self.shader:
-            self.shader.destroy()
-
         # Destroy SDL context and window
         SDL_GL_DeleteContext(self.context)
         SDL_DestroyWindow(self.window)
