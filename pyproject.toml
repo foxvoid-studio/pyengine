@@ -1,0 +1,22 @@
+[project]
+name = "pyengine"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Ethan Rucar",email = "ethan.rucar@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "pysdl2 (>=0.9.17,<0.10.0)",
+    "pysdl2-dll (>=2.32.0,<3.0.0)",
+    "pyopengl (>=3.1.10,<4.0.0)",
+    "numpy (>=2.3.5,<3.0.0)",
+    "pyglm (>=2.8.3,<3.0.0)"
+    
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
