@@ -10,6 +10,7 @@ from pyengine.graphics.mesh_renderer import MeshRenderer
 from pyengine.ecs.entity_manager import EntityManager
 from pyengine.graphics.render_system import RenderSystem
 from pyengine.core.input_manager import InputManager
+from pyengine.core.time_manager import TimeManager
 
 
 # =============================================================================
@@ -28,6 +29,7 @@ class App:
         self._init_sdl()
         
         self.input = InputManager()
+        self.time = TimeManager()
         self.entity_manager = EntityManager()
         self.render_system = RenderSystem()
         
@@ -118,6 +120,9 @@ class App:
                     # Update viewport when window is resized
                     glViewport(0, 0, event.window.data1, event.window.data2)
 
+    def set_title(self, title: str) -> None:
+        SDL_SetWindowTitle(self.window, title.encode())
+
     def run(self) -> None:
         """
         The main application loop.
@@ -125,20 +130,26 @@ class App:
         self.running = True
         
         while self.running:
-            # 1. Prepare Input Manager for the new frame (clear "just pressed" flags)
+            # 1. Update Time (Must be first)
+            self.time.update()
+
+            # 2. Prepare Input Manager for the new frame (clear "just pressed" flags)
             self.input.update()
 
-            # 2. Handle input/events (fills Input Manager with new data)
+            # 3. Handle input/events (fills Input Manager with new data)
             self.process_events()
 
-            # 3. Game Logic using InputManager
+            # 4. Game Logic using InputManager
             if self.input.is_key_pressed(SDLK_ESCAPE):
                 self.running = False
             
             for entity, (transform,) in self.entity_manager.get_entities_with(Transform):
                 if entity == 0:
-                    transform.rotation.z += 0.02
+                    transform.rotation.z += 1.0 * self.time.delta_time
             
+            # (Optional but here for debug) Update window title with FPS
+            self.set_title(f"{self.title.decode()} - FPS: {self.time.fps}")
+
             # Render
             self.render_system.update(self.entity_manager)
 
