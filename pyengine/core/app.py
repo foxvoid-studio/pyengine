@@ -11,6 +11,7 @@ from pyengine.ecs.entity_manager import EntityManager
 from pyengine.graphics.render_system import RenderSystem
 from pyengine.core.input_manager import InputManager
 from pyengine.core.time_manager import TimeManager
+from pyengine.graphics.material import Material
 
 
 # =============================================================================
@@ -86,20 +87,24 @@ class App:
         rect_geo = Rectangle(self.shader)
         self.meshes.extend([tri_geo, rect_geo])
 
+        mat_logo = Material(self.shader, texture=logo_texture)
+        mat_red_logo = Material(self.shader, texture=logo_texture, color=(1.0, 0.0, 0.0, 1.0))
+        mat_green_logo = Material(self.shader, texture=logo_texture, color=(0.0, 1.0, 0.0, 1.0))   
+
         # Entity 1: Rotating Triangle
         e1 = self.entity_manager.create_entity()
         self.entity_manager.add_component(e1, Transform(position=(0,0,0), scale=(0.5, 0.5, 1)))
-        self.entity_manager.add_component(e1, MeshRenderer(tri_geo, self.shader, logo_texture))
+        self.entity_manager.add_component(e1, MeshRenderer(tri_geo, mat_red_logo))
 
         # Entity 2: Rectangle
         e2 = self.entity_manager.create_entity()
         self.entity_manager.add_component(e2, Transform(position=(-0.6, 0, 0), scale=(0.7, 0.7, 1)))
-        self.entity_manager.add_component(e2, MeshRenderer(rect_geo, self.shader, logo_texture))
+        self.entity_manager.add_component(e2, MeshRenderer(rect_geo, mat_logo))
 
         # Entity 3: Ground
         e3 = self.entity_manager.create_entity()
         self.entity_manager.add_component(e3, Transform(position=(0.6, -0.5, 0), scale=(0.8, 0.1, 1)))
-        self.entity_manager.add_component(e3, MeshRenderer(rect_geo, self.shader, logo_texture))
+        self.entity_manager.add_component(e3, MeshRenderer(rect_geo, mat_green_logo))
 
     def process_events(self) -> None:
         """
