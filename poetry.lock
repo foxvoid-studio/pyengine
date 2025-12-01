@@ -317,7 +317,21 @@ files = [
     {file = "pysdl2_dll-2.32.0-py2.py3-none-win_amd64.whl", hash = "sha256:28f577907bf17df3b3600daebbf0534aeaa44af266430ba09c7e04ab3e22b41f"},
 ]
 
+[[package]]
+name = "pywavefront"
+version = "1.3.3"
+description = "Python library for importing Wavefront .obj files"
+optional = false
+python-versions = ">=3.4"
+groups = ["main"]
+files = [
+    {file = "PyWavefront-1.3.3-py3-none-any.whl", hash = "sha256:ec79cadd046b168434b01031e574f4105f821d06cb8cf754801e4dc18076bbeb"},
+]
+
+[package.extras]
+visualization = ["pyglet"]
+
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.14"
-content-hash = "e2ca5a0d48e19e3b16d91ca714703ea82d42fca131608445b5dc036f4f467e01"
+content-hash = "aad8b71f00f7731eeed0b10f2b8e260cbcc84a3b36f6d147f53c7bbf94fc88d5"

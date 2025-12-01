@@ -82,6 +82,12 @@ class Game3D(App):
         self.entity_manager.add_component(cube, Transform(position=(0, 0.5, 0)))
         self.entity_manager.add_component(cube, MeshRenderer(cube_geo, mat_object))
 
+        # --- Pyramid from obj file ---
+        mesh_pyramid = self.resources.get_mesh("assets/pyramid.obj", shader)
+        pyramid = self.entity_manager.create_entity()
+        self.entity_manager.add_component(pyramid, Transform(position=(2.0, 0.5, 0.0)))
+        self.entity_manager.add_component(pyramid, MeshRenderer(mesh_pyramid, mat_object))
+
 
 if __name__ == "__main__":
     app = Game3D(800, 600, "Pyengine")

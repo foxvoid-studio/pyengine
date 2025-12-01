@@ -2,6 +2,8 @@ from typing import Dict, Tuple
 from pyengine.core.logger import Logger
 from pyengine.gl_utils.texture import Texture
 from pyengine.gl_utils.shader import ShaderProgram
+from pyengine.gl_utils.mesh import Mesh
+from pyengine.gl_utils.obj_loader import load_obj_file
 
 
 class ResourceManager:
@@ -15,6 +17,10 @@ class ResourceManager:
         
         # Cache for shaders: (VertPath, FragPath) -> Shader Object
         self._shaders: Dict[Tuple[str, str], ShaderProgram] = {}
+
+        # Cache for Mesh Data
+        # Key: file_path, Value: Mesh Object
+        self._meshes: Dict[str, Mesh] = {}
 
     def get_texture(self, path: str) -> Texture:
         """
@@ -39,6 +45,24 @@ class ResourceManager:
             
         return self._shaders[key]
     
+    def get_mesh(self, path: str, shader: ShaderProgram) -> Mesh:
+        """
+        Loads an OBJ file into a Mesh object.
+        """
+        if path not in self._meshes:
+            Logger.debug(f"Loading mesh from disk: {path}")
+            
+            # 1. Parse Data
+            vertices = load_obj_file(path)
+            
+            # 2. Create Mesh Object
+            # We use the base Mesh class since it takes raw vertices
+            mesh = Mesh(shader, vertices)
+            
+            self._meshes[path] = mesh
+        
+        return self._meshes[path]
+    
     def clear(self) -> None:
         """
         Destroys all stored OpenGL resources.
@@ -51,6 +75,11 @@ class ResourceManager:
         for shader in self._shaders.values():
             shader.destroy()
         self._shaders.clear()
+
+        # Clear meshes
+        for mesh in self._meshes.values():
+            mesh.destroy()
+        self._meshes.clear()
         
         Logger.info("[ResourceManager] All resources cleared.")
         
