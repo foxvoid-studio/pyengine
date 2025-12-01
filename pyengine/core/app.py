@@ -13,6 +13,8 @@ from pyengine.core.time_manager import TimeManager
 from pyengine.core.resource_manager import ResourceManager
 from pyengine.graphics.material import Material
 from pyengine.graphics.camera import Camera2D, MainCamera
+from pyengine.graphics.sprite import SpriteSheet, Animator, Animation
+from pyengine.graphics.animation_system import AnimationSystem
 
 
 # =============================================================================
@@ -37,6 +39,8 @@ class App:
         self.time = TimeManager()
         self.resources = ResourceManager()
         self.entity_manager = EntityManager()
+
+        self.animation_system = AnimationSystem()
         self.render_system = RenderSystem()
 
         self.camera_entity = None
@@ -86,34 +90,29 @@ class App:
         # 1. Load Shader
         shader = self.resources.get_shader("shaders/mesh.vert", "shaders/mesh.frag")
 
-        logo_texture = self.resources.get_texture("assets/logo.png")
-
-        tri_geo = Triangle(shader)
-        rect_geo = Rectangle(shader)
-
-        mat_logo = Material(shader, texture=logo_texture)
-        mat_red_logo = Material(shader, texture=logo_texture, color=(1.0, 0.0, 0.0, 1.0))
-        mat_green_logo = Material(shader, texture=logo_texture, color=(0.0, 1.0, 0.0, 1.0))
+        # Enable blending for transparent PNGs (Important for sprites!)
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         self.camera_entity = self.entity_manager.create_entity()
         self.entity_manager.add_component(self.camera_entity, Transform())
         self.entity_manager.add_component(self.camera_entity, Camera2D(self.width, self.height, ortho_size=5.0))
         self.entity_manager.add_component(self.camera_entity, MainCamera())
 
-        # Entity 1: Rotating Triangle
-        e1 = self.entity_manager.create_entity()
-        self.entity_manager.add_component(e1, Transform(position=(0,0,0), scale=(0.5, 0.5, 1)))
-        self.entity_manager.add_component(e1, MeshRenderer(tri_geo, mat_red_logo))
+        # Create player
+        player_base = self.resources.get_texture("assets/player_base.png")
+        mat_player = Material(self.resources.get_shader("shaders/mesh.vert", "shaders/mesh.frag"), texture=player_base)
+        rect_geo = Rectangle(shader)
 
-        # Entity 2: Rectangle
-        e2 = self.entity_manager.create_entity()
-        self.entity_manager.add_component(e2, Transform(position=(-0.6, 0, 0), scale=(0.7, 0.7, 1)))
-        self.entity_manager.add_component(e2, MeshRenderer(rect_geo, mat_logo))
+        player = self.entity_manager.create_entity()
+        self.entity_manager.add_component(player, Transform())
+        self.entity_manager.add_component(player, MeshRenderer(rect_geo, mat_player))
+        self.entity_manager.add_component(player, SpriteSheet(rows=56, cols=9))
 
-        # Entity 3: Ground
-        e3 = self.entity_manager.create_entity()
-        self.entity_manager.add_component(e3, Transform(position=(0.6, -0.5, 0), scale=(0.8, 0.1, 1)))
-        self.entity_manager.add_component(e3, MeshRenderer(rect_geo, mat_green_logo))
+        player_animator = Animator()
+        player_animator.add("idle_down", Animation(0, 5, 0.1))
+        player_animator.play("idle_down")
+        self.entity_manager.add_component(player, player_animator)
 
     def process_events(self) -> None:
         """
@@ -165,6 +164,9 @@ class App:
             # (Optional but here for debug) Update window title with FPS
             self.set_title(f"{self.title.decode()} - FPS: {self.time.fps}")
 
+            # Update Animations BEFORE Rendering
+            self.animation_system.update(self.entity_manager, self.time)
+
             # Render
             self.render_system.update(self.entity_manager)
 
@@ -187,10 +189,6 @@ class App:
     def temp_game_logic(self):
         if self.input.is_key_pressed(SDLK_ESCAPE):
             self.running = False
-            
-        for entity, (transform,) in self.entity_manager.get_entities_with(Transform):
-            if entity == 1:
-                transform.rotation.z += 1.0 * self.time.delta_time
 
         # Retrieve components for the camera entity
         cam_transform = self.entity_manager.get_component(self.camera_entity, Transform)
@@ -202,11 +200,11 @@ class App:
 
             if scroll != 0:
                 zoom_amount = scroll * 0.5
-                self.camera_entity.zoom += zoom_amount
+                cam_comp.zoom += zoom_amount
 
                 # SÉCURITÉ : Empêcher le zoom d'être négatif ou nul
-                if self.camera_entity.zoom < 0.1:
-                    self.camera_entity.zoom = 0.1
+                if cam_comp.zoom < 0.1:
+                    cam_comp.zoom = 0.1
 
             cam_speed = 5.0 * dt
 

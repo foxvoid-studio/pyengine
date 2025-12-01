@@ -6,6 +6,7 @@ from pyengine.physics.transform import Transform
 from pyengine.graphics.mesh_renderer import MeshRenderer
 from pyengine.graphics.camera import Camera2D, MainCamera
 from pyengine.graphics.material import Material
+from pyengine.graphics.sprite import SpriteSheet
 
 
 class RenderSystem:
@@ -48,7 +49,7 @@ class RenderSystem:
         glClearColor(0.1, 0.1, 0.2, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)
 
-        for _, (transform, renderer) in entity_manager.get_entities_with(Transform, MeshRenderer):
+        for entity, (transform, renderer) in entity_manager.get_entities_with(Transform, MeshRenderer):
             
             # Accès via le material
             material: Material = renderer.material
@@ -58,6 +59,21 @@ class RenderSystem:
 
             # --- 1. Material Properties (Texture & Color) ---
             self._bind_material(material)
+
+            # Check if this entity has a SpriteSheet component
+            sprite_sheet = entity_manager.get_component(entity, SpriteSheet)
+            loc_scale = glGetUniformLocation(material.shader.id, "u_uv_scale")
+            loc_offset = glGetUniformLocation(material.shader.id, "u_uv_offset")
+
+            if sprite_sheet:
+                # Calculate UVs based on current frame
+                sx, sy, ox, oy = sprite_sheet.get_uv_transform()
+                glUniform2f(loc_scale, sx, sy)
+                glUniform2f(loc_offset, ox, oy)
+            else:
+                # Default for normal objects (Display full texture)
+                glUniform2f(loc_scale, 1.0, 1.0)
+                glUniform2f(loc_offset, 0.0, 0.0)
 
             # --- 2. Camera Matrices ---
             material.shader.set_uniform_matrix("u_view", view_matrix)

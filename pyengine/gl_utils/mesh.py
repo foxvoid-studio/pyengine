@@ -81,12 +81,6 @@ class Rectangle(Mesh):
     Constructed using 2 Triangles (6 vertices).
     """
     def __init__(self, shader: ShaderProgram):
-        """
-        :param x: Center X
-        :param y: Center Y
-        :param width: Total width
-        :param height: Total height
-        """
         # We define 2 triangles to make a rectangle (quads are deprecated in modern core GL)
         # Triangle 1: Bottom-Left, Bottom-Right, Top-Left
         # Triangle 2: Bottom-Right, Top-Right, Top-Left
