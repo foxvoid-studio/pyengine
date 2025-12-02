@@ -1,2 +1,7 @@
 newmtl PyramidMat
+# Couleur ambiante (blanc)
+Ka 1.0 1.0 1.0
+# Couleur diffuse (blanc)
+Kd 1.0 1.0 1.0
+# La texture
 map_Kd logo.png

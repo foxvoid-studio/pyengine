@@ -1,37 +1,48 @@
 mtllib pyramid.mtl
 
-# Pyramide simple
-# v = Vertices (Sommets: x y z)
-v  0.0  0.5  0.0
-v -0.5 -0.5  0.5
-v  0.5 -0.5  0.5
-v  0.5 -0.5 -0.5
-v -0.5 -0.5 -0.5
+# --- Sommets (Vertices) ---
+# v x y z
+v  0.0  0.5  0.0  # 1. Sommet (Haut)
+v -0.5 -0.5  0.5  # 2. Bas Gauche Avant
+v  0.5 -0.5  0.5  # 3. Bas Droite Avant
+v  0.5 -0.5 -0.5  # 4. Bas Droite Arrière
+v -0.5 -0.5 -0.5  # 5. Bas Gauche Arrière
 
-# vt = Texture Coordinates (UV: u v)
-vt 0.0 0.0
-vt 1.0 0.0
-vt 0.5 1.0
-vt 1.0 1.0
-vt 0.0 1.0
+# --- Coordonnées de Texture (UVs) ---
+# vt u v
+vt 0.5 1.0  # 1. Haut Centre
+vt 0.0 0.0  # 2. Bas Gauche
+vt 1.0 0.0  # 3. Bas Droite
+vt 1.0 1.0  # 4. Haut Droite (pour la base)
+vt 0.0 1.0  # 5. Haut Gauche (pour la base)
 
+# --- Normales (Normals) ---
+# vn x y z
+# Ces vecteurs indiquent au shader comment la lumière rebondit
+
+vn  0.0     0.4472  0.8944  # 1. Normale Face Avant (Penche vers Z+)
+vn  0.8944  0.4472  0.0     # 2. Normale Face Droite (Penche vers X+)
+vn  0.0     0.4472 -0.8944  # 3. Normale Face Arrière (Penche vers Z-)
+vn -0.8944  0.4472  0.0     # 4. Normale Face Gauche (Penche vers X-)
+vn  0.0    -1.0     0.0     # 5. Normale Base (Pointe vers le bas)
+
+# --- Faces ---
+# Format: v/vt/vn (Sommet / Texture / Normale)
 usemtl PyramidMat
 
-# f = Faces (Indices: v/vt)
-# Note: Les indices commencent à 1 en OBJ
+# Face Avant (Utilise la Normale 1)
+f 1/1/1 2/2/1 3/3/1
 
-# Face Avant
-f 1/3 2/1 3/2
+# Face Droite (Utilise la Normale 2)
+f 1/1/2 3/2/2 4/3/2
 
-# Face Droite
-f 1/3 3/1 4/2
+# Face Arrière (Utilise la Normale 3)
+f 1/1/3 4/2/3 5/3/3
 
-# Face Arrière
-f 1/3 4/1 5/2
+# Face Gauche (Utilise la Normale 4)
+f 1/1/4 5/2/4 2/3/4
 
-# Face Gauche
-f 1/3 5/1 2/2
-
-# Base (Carrée -> Découpée en 2 triangles)
-f 2/1 3/2 4/4
-f 2/1 4/4 5/5
+# Base (Carrée -> 2 Triangles, Utilise la Normale 5)
+# Note: On map les UVs aux 4 coins (indices vt 2,3,4,5) pour couvrir le carré
+f 2/2/5 3/3/5 4/4/5
+f 2/2/5 4/4/5 5/5/5

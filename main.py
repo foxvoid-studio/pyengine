@@ -92,7 +92,7 @@ class Game3D(App):
         mesh_pyramid_part = self.resources.load_model("assets/pyramid.obj", shader)
         for mesh, material in mesh_pyramid_part:
             part_entity = self.entity_manager.create_entity()
-            self.entity_manager.add_component(part_entity, Transform(position=(2.0, 0.5, 0.0)))
+            self.entity_manager.add_component(part_entity, Transform(position=(3.0, 0.5, 0.0)))
             self.entity_manager.add_component(part_entity, MeshRenderer(mesh, material))
 
 
