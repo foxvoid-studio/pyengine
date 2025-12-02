@@ -1,19 +1,16 @@
 import sys
 import ctypes
+import sdl2.sdlttf
 from sdl2 import *
 from OpenGL.GL import *
 from pyengine.core.logger import Logger
-from pyengine.gl_utils.mesh import Triangle, Rectangle
 from pyengine.physics.transform import Transform
-from pyengine.graphics.mesh_renderer import MeshRenderer
 from pyengine.ecs.entity_manager import EntityManager
 from pyengine.graphics.render_system import RenderSystem
 from pyengine.core.input_manager import InputManager
 from pyengine.core.time_manager import TimeManager
 from pyengine.core.resource_manager import ResourceManager
-from pyengine.graphics.material import Material
-from pyengine.graphics.camera import Camera2D, Camera3D, MainCamera
-from pyengine.graphics.sprite import SpriteSheet, Animator, Animation
+from pyengine.graphics.camera import Camera2D, Camera3D
 from pyengine.graphics.animation_system import AnimationSystem
 
 
@@ -54,6 +51,11 @@ class App:
         # Initialize the video subsystem
         if SDL_Init(SDL_INIT_VIDEO) != 0:
             Logger.critical(f"Failed to initialize SDL: {SDL_GetError()}")
+            sys.exit(-1)
+
+        # Initialize SDL_ttf
+        if sdl2.sdlttf.TTF_Init() == -1:
+            Logger.critical("Failed to initialize SDL_ttf")
             sys.exit(-1)
 
         # Set OpenGL attributes *before* creating the window.
@@ -119,6 +121,10 @@ class App:
                     if cam_comp:
                         cam_comp.resize(new_w, new_h)
 
+                    cam_comp = self.entity_manager.get_component(self.camera_entity, Camera3D)
+                    if cam_comp:
+                        cam_comp.resize(new_w, new_h)
+
     def set_title(self, title: str) -> None:
         SDL_SetWindowTitle(self.window, title.encode())
 
@@ -139,9 +145,6 @@ class App:
             self.process_events()
 
             self.temp_game_logic()
-            
-            # (Optional but here for debug) Update window title with FPS
-            self.set_title(f"{self.title.decode()} - FPS: {self.time.fps}")
 
             # Update Animations BEFORE Rendering
             self.animation_system.update(self.entity_manager, self.time)
@@ -161,6 +164,7 @@ class App:
         This prevents 'sys.meta_path is None' errors during interpreter shutdown.
         """
         # Destroy SDL context and window
+        sdl2.sdlttf.TTF_Quit()
         SDL_GL_DeleteContext(self.context)
         SDL_DestroyWindow(self.window)
         SDL_Quit()

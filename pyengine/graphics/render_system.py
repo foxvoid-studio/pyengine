@@ -8,11 +8,203 @@ from pyengine.graphics.camera import Camera2D, Camera3D, MainCamera
 from pyengine.graphics.material import Material
 from pyengine.graphics.sprite import SpriteSheet
 from pyengine.graphics.light import DirectionalLight, PointLight
-
+from pyengine.gui.text_renderer import TextRenderer
+from pyengine.gl_utils.mesh import Rectangle
 
 class RenderSystem:
+    def __init__(self):
+        # We need a reusable mesh for UI (a simple quad).
+        # We initialize it lazily because we need an active shader to create the VAO.
+        self.ui_mesh = None
+
+    def update(self, entity_manager: EntityManager):
+        """
+        Main rendering loop orchestration.
+        """
+        # 1. Clear Screen
+        glClearColor(0.1, 0.1, 0.2, 1.0)
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+
+        # 2. Find Camera & Determine Mode (2D vs 3D)
+        camera_data = self._find_active_camera(entity_manager)
+        if not camera_data:
+            return # Warning is logged inside _find_active_camera
+
+        cam_component, cam_transform, is_3d_mode = camera_data
+
+        # 3. Collect Lights (shared for the whole frame)
+        lights = self._collect_lights(entity_manager)
+
+        # 4. RENDER WORLD (Meshes, Sprites, 3D Models)
+        self._render_world_pass(entity_manager, cam_component, cam_transform, is_3d_mode, lights)
+
+        # 5. RENDER UI (Text, Overlays)
+        self._render_ui_pass(entity_manager)
+
+    # =========================================================================
+    # INTERNAL HELPERS (LOGIC SEPARATION)
+    # =========================================================================
+
+    def _find_active_camera(self, entity_manager: EntityManager):
+        """
+        Returns (camera_component, camera_transform, is_3d_mode) or None.
+        """
+        for entity, (main_cam_tag, transform) in entity_manager.get_entities_with(MainCamera, Transform):
+            c3d = entity_manager.get_component(entity, Camera3D)
+            c2d = entity_manager.get_component(entity, Camera2D)
+            
+            if c3d: return c3d, transform, True
+            if c2d: return c2d, transform, False
+        
+        # Limit warning spam in a real engine, but fine for now
+        # Logger.warning("No camera found") 
+        return None
+
+    def _collect_lights(self, entity_manager: EntityManager):
+        """
+        Returns a tuple (DirectionalLight, List[PointLights]).
+        """
+        dir_light = None
+        for _, (l,) in entity_manager.get_entities_with(DirectionalLight):
+            dir_light = l
+            break 
+        
+        point_lights = []
+        for _, (l, t) in entity_manager.get_entities_with(PointLight, Transform):
+            point_lights.append((l, t))
+            if len(point_lights) >= 4: break 
+            
+        return dir_light, point_lights
+
+    # =========================================================================
+    # RENDER PASSES
+    # =========================================================================
+
+    def _render_world_pass(self, entity_manager, camera, cam_transform, is_3d, lights):
+        """
+        Handles the rendering of the 3D/2D game world.
+        """
+        dir_light, point_lights = lights
+        
+        # Configure OpenGL for World
+        if is_3d:
+            glEnable(GL_DEPTH_TEST)
+        else:
+            glDisable(GL_DEPTH_TEST)
+
+        # Pre-calculate Matrices
+        view_matrix = camera.get_view_matrix(cam_transform)
+        proj_matrix = camera.get_projection_matrix()
+
+        # Render Loop
+        for entity, (transform, renderer) in entity_manager.get_entities_with(Transform, MeshRenderer):
+            material = renderer.material
+            mesh = renderer.mesh
+            shader = material.shader
+            
+            shader.use()
+
+            # 1. Bind Material (Texture/Color)
+            self._bind_material(material)
+
+            # 2. Upload Lights
+            self._upload_lighting_uniforms(shader, dir_light, point_lights)
+
+            # 3. Handle SpriteSheet Animation
+            self._upload_sprite_uniforms(entity_manager, entity, shader)
+
+            # 4. Upload Matrices
+            shader.set_uniform_matrix("u_view", view_matrix)
+            shader.set_uniform_matrix("u_projection", proj_matrix)
+
+            model = self._calculate_model_matrix(transform)
+            shader.set_uniform_matrix("u_model", model)
+
+            # 5. Draw
+            mesh.bind()
+            glDrawArrays(GL_TRIANGLES, 0, mesh.count)
+            mesh.unbind()
+            shader.unuse()
+
+    def _render_ui_pass(self, entity_manager: EntityManager):
+        """
+        Handles the rendering of UI elements (Text, etc.) on top of the world.
+        """
+        # Configure OpenGL for UI
+        glDisable(GL_DEPTH_TEST) # Always on top
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
+        # Get Viewport for Orthographic projection (Pixel Coordinates)
+        viewport = glGetIntegerv(GL_VIEWPORT)
+        width, height = viewport[2], viewport[3]
+        ui_projection = glm.ortho(0.0, width, 0.0, height)
+        ui_view = glm.mat4(1.0) # Identity view
+
+        for entity, (transform, text_renderer) in entity_manager.get_entities_with(Transform, TextRenderer):
+            
+            # 1. Update Texture if dirty (Text changed)
+            if text_renderer.is_dirty:
+                if text_renderer.texture:
+                    text_renderer.texture.destroy()
+                text_renderer.texture = text_renderer.font.render_text(text_renderer.text, text_renderer.color)
+                text_renderer.is_dirty = False
+                
+                # Setup Material if missing (Assuming simple shader)
+                # Note: In a real engine, use a dedicated UI shader.
+                if not text_renderer.material and text_renderer.texture:
+                    # We need to ensure we have a material to render
+                    pass 
+
+            if not text_renderer.texture or not text_renderer.material:
+                continue
+
+            shader = text_renderer.material.shader
+            shader.use()
+
+            # 2. Bind Texture manually for UI
+            glActiveTexture(GL_TEXTURE0)
+            glBindTexture(GL_TEXTURE_2D, text_renderer.texture.id)
+            glUniform1i(glGetUniformLocation(shader.id, "u_texture"), 0)
+            glUniform1i(glGetUniformLocation(shader.id, "u_use_texture"), 1)
+            # Force white tint so text color comes from texture (SDL_ttf)
+            glUniform4f(glGetUniformLocation(shader.id, "u_color"), 1, 1, 1, 1)
+
+            # 3. Disable Lighting for UI
+            # We explicitly turn off lights so text isn't affected by sun/lamps
+            glUniform3f(glGetUniformLocation(shader.id, "u_ambientColor"), 1, 1, 1) # Full Bright
+            glUniform1f(glGetUniformLocation(shader.id, "u_dirLight.intensity"), 0.0)
+            glUniform1i(glGetUniformLocation(shader.id, "u_pointLightCount"), 0)
+            
+            # Reset UVs
+            glUniform2f(glGetUniformLocation(shader.id, "u_uv_scale"), 1.0, 1.0)
+            glUniform2f(glGetUniformLocation(shader.id, "u_uv_offset"), 0.0, 0.0)
+
+            # 4. Matrices (Screen Space)
+            shader.set_uniform_matrix("u_view", ui_view)
+            shader.set_uniform_matrix("u_projection", ui_projection)
+
+            # Model Matrix: Scale quad to match texture size
+            model = glm.mat4(1.0)
+            model = glm.translate(model, transform.position)
+            model = glm.scale(model, glm.vec3(text_renderer.texture.width, text_renderer.texture.height, 1.0))
+            model = glm.scale(model, transform.scale) # User scale
+            shader.set_uniform_matrix("u_model", model)
+
+            # 5. Draw Quad
+            if self.ui_mesh is None:
+                self.ui_mesh = Rectangle(shader)
+            
+            self.ui_mesh.bind()
+            glDrawArrays(GL_TRIANGLES, 0, self.ui_mesh.count)
+            self.ui_mesh.unbind()
+            shader.unuse()
+
+    # =========================================================================
+    # LOW-LEVEL UPLOAD HELPERS
+    # =========================================================================
+
     def _bind_material(self, material: Material):
-        # Helper to keep update() clean
         loc_color = glGetUniformLocation(material.shader.id, "u_color")
         loc_use_tex = glGetUniformLocation(material.shader.id, "u_use_texture")
         loc_tex = glGetUniformLocation(material.shader.id, "u_texture")
@@ -27,149 +219,57 @@ class RenderSystem:
             glUniform1i(loc_use_tex, 0)
             glBindTexture(GL_TEXTURE_2D, 0)
 
+    def _upload_lighting_uniforms(self, shader, dir_light, point_lights):
+        # Ambient
+        loc_amb = glGetUniformLocation(shader.id, "u_ambientColor")
+        glUniform3f(loc_amb, 0.1, 0.1, 0.1)
+
+        # Directional
+        if dir_light:
+            self._upload_dir_light(shader, dir_light)
+        else:
+            glUniform1f(glGetUniformLocation(shader.id, "u_dirLight.intensity"), 0.0)
+
+        # Point Lights
+        glUniform1i(glGetUniformLocation(shader.id, "u_pointLightCount"), len(point_lights))
+        for i, (light, light_trans) in enumerate(point_lights):
+            self._upload_point_light(shader, i, light, light_trans)
+
+    def _upload_sprite_uniforms(self, entity_manager, entity, shader):
+        sprite_sheet = entity_manager.get_component(entity, SpriteSheet)
+        loc_scale = glGetUniformLocation(shader.id, "u_uv_scale")
+        loc_offset = glGetUniformLocation(shader.id, "u_uv_offset")
+
+        if sprite_sheet:
+            sx, sy, ox, oy = sprite_sheet.get_uv_transform()
+            glUniform2f(loc_scale, sx, sy)
+            glUniform2f(loc_offset, ox, oy)
+        else:
+            glUniform2f(loc_scale, 1.0, 1.0)
+            glUniform2f(loc_offset, 0.0, 0.0)
+
+    def _calculate_model_matrix(self, transform):
+        model = glm.mat4(1.0)
+        model = glm.translate(model, transform.position)
+        
+        # Simple Euler Rotation (Sequential)
+        if transform.rotation.x != 0: model = glm.rotate(model, transform.rotation.x, glm.vec3(1, 0, 0))
+        if transform.rotation.y != 0: model = glm.rotate(model, transform.rotation.y, glm.vec3(0, 1, 0))
+        if transform.rotation.z != 0: model = glm.rotate(model, transform.rotation.z, glm.vec3(0, 0, 1))
+
+        model = glm.scale(model, transform.scale)
+        return model
+
     def _upload_dir_light(self, shader, light: DirectionalLight):
-        # Helper to upload uniform struct
         glUniform3f(glGetUniformLocation(shader.id, "u_dirLight.direction"), *light.direction)
         glUniform3f(glGetUniformLocation(shader.id, "u_dirLight.color"), *light.color)
         glUniform1f(glGetUniformLocation(shader.id, "u_dirLight.intensity"), light.intensity)
 
     def _upload_point_light(self, shader, index: int, light: PointLight, transform: Transform):
-        # Helper to construct array strings: u_pointLights[0].position
         base = f"u_pointLights[{index}]"
-        
         glUniform3f(glGetUniformLocation(shader.id, f"{base}.position"), *transform.position)
         glUniform3f(glGetUniformLocation(shader.id, f"{base}.color"), *light.color)
         glUniform1f(glGetUniformLocation(shader.id, f"{base}.intensity"), light.intensity)
         glUniform1f(glGetUniformLocation(shader.id, f"{base}.constant"), light.constant)
         glUniform1f(glGetUniformLocation(shader.id, f"{base}.linear"), light.linear)
         glUniform1f(glGetUniformLocation(shader.id, f"{base}.quadratic"), light.quadratic)
-
-    def update(self, entity_manager: EntityManager):
-        glClearColor(0.1, 0.1, 0.2, 1.0)
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-
-        # 1. Find Main Camera (Generic search)
-        camera_component = None
-        camera_transform = None
-        is_3d_mode = False
-
-        # Look for entity with MainCamera AND Transform
-        # Note: We check specifically for Camera3D or Camera2D
-        # Or you can just duck-type if you iterate all entities with MainCamera
-        
-        for entity, (main_cam_tag, transform) in entity_manager.get_entities_with(MainCamera, Transform):
-            # Check if it has 3D or 2D camera
-            c3d = entity_manager.get_component(entity, Camera3D)
-            c2d = entity_manager.get_component(entity, Camera2D)
-            
-            if c3d:
-                camera_component = c3d
-                camera_transform = transform
-                is_3d_mode = True
-                break
-            elif c2d:
-                camera_component = c2d
-                camera_transform = transform
-                is_3d_mode = False
-                break
-        
-        if not camera_component:
-            Logger.warning("No camera found")
-            return
-        
-        if is_3d_mode:
-            # 3D: We need Z-Buffer to handle occlusion
-            glEnable(GL_DEPTH_TEST)
-        else:
-            # 2D: We usually disable Z-Buffer so sprites behave like layers 
-            # (or use Z for layering, but disabling is safer for simple 2D)
-            glDisable(GL_DEPTH_TEST)
-        
-        view_matrix = camera_component.get_view_matrix(camera_transform)
-        proj_matrix = camera_component.get_projection_matrix()
-
-        # --- LIGHTING SETUP (NEW) ---
-        
-        # 1. Find Directional Light (Only 1 supported in this shader version)
-        dir_light = None
-        for _, (l,) in entity_manager.get_entities_with(DirectionalLight):
-            dir_light = l
-            break # Take the first one found
-        
-        # 2. Find Point Lights
-        point_lights = []
-        for _, (l, t) in entity_manager.get_entities_with(PointLight, Transform):
-            point_lights.append((l, t))
-            if len(point_lights) >= 4: break # Max 4 lights
-
-        for entity, (transform, renderer) in entity_manager.get_entities_with(Transform, MeshRenderer):
-            
-            # Accès via le material
-            material: Material = renderer.material
-            mesh = renderer.mesh
-            
-            material.shader.use()
-
-            # --- 1. Material Properties (Texture & Color) ---
-            self._bind_material(material)
-
-            # --- UPLOAD LIGHT UNIFORMS ---
-            
-            # Ambient
-            loc_amb = glGetUniformLocation(material.shader.id, "u_ambientColor")
-            glUniform3f(loc_amb, 0.1, 0.1, 0.1) # Soft global ambient
-
-            # Directional Light
-            if dir_light:
-                self._upload_dir_light(material.shader, dir_light)
-            else:
-                # Disable dir light (intensity 0)
-                glUniform1f(glGetUniformLocation(material.shader.id, "u_dirLight.intensity"), 0.0)
-
-            # Point Lights
-            glUniform1i(glGetUniformLocation(material.shader.id, "u_pointLightCount"), len(point_lights))
-            
-            for i, (light, light_trans) in enumerate(point_lights):
-                self._upload_point_light(material.shader, i, light, light_trans)
-
-            # Check if this entity has a SpriteSheet component
-            sprite_sheet = entity_manager.get_component(entity, SpriteSheet)
-            loc_scale = glGetUniformLocation(material.shader.id, "u_uv_scale")
-            loc_offset = glGetUniformLocation(material.shader.id, "u_uv_offset")
-
-            if sprite_sheet:
-                # Calculate UVs based on current frame
-                sx, sy, ox, oy = sprite_sheet.get_uv_transform()
-                glUniform2f(loc_scale, sx, sy)
-                glUniform2f(loc_offset, ox, oy)
-            else:
-                # Default for normal objects (Display full texture)
-                glUniform2f(loc_scale, 1.0, 1.0)
-                glUniform2f(loc_offset, 0.0, 0.0)
-
-            # --- 2. Camera Matrices ---
-            material.shader.set_uniform_matrix("u_view", view_matrix)
-            material.shader.set_uniform_matrix("u_projection", proj_matrix)
-
-            # --- 3. Model Matrix ---
-            model = glm.mat4(1.0)
-            model = glm.translate(model, transform.position)
-
-            # Rotation logic (Handling 3D rotation vs 2D rotation)
-            # transform.rotation is usually a vec3. 
-            # Ideally, transform should handle full Quaternion or Euler XYZ rotation.
-            # For now, applying axes sequentially:
-            model = glm.rotate(model, transform.rotation.x, glm.vec3(1, 0, 0))
-            model = glm.rotate(model, transform.rotation.y, glm.vec3(0, 1, 0))
-            model = glm.rotate(model, transform.rotation.z, glm.vec3(0, 0, 1))
-
-            model = glm.scale(model, transform.scale)
-
-            material.shader.set_uniform_matrix("u_model",model)
-
-            # --- 3. Draw ---
-            mesh.bind()
-            glDrawArrays(GL_TRIANGLES, 0, mesh.count)
-            mesh.unbind()
-            
-            material.shader.unuse()

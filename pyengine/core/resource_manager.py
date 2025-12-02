@@ -6,6 +6,7 @@ from pyengine.gl_utils.shader import ShaderProgram
 from pyengine.gl_utils.mesh import Mesh
 from pyengine.gl_utils.obj_loader import load_obj_model
 from pyengine.graphics.material import Material
+from pyengine.gui.font import Font
 
 
 class ResourceManager:
@@ -23,6 +24,9 @@ class ResourceManager:
         # Cache for Mesh Data
         # Key: file_path, Value: Mesh Object
         self._meshes: Dict[str, Mesh] = {}
+
+        # Cache for fonts
+        self._fonts: Dict[Tuple[str, int], Font] = {}
 
     def get_texture(self, path: str) -> Texture:
         """
@@ -101,6 +105,12 @@ class ResourceManager:
             self._meshes[path] = mesh
         
         return self._meshes[path]
+    
+    def get_font(self, path: str, size: int) -> Font:
+        key = (path, size)
+        if key not in self._fonts:
+            self._fonts[key] = Font(path, size)
+        return self._fonts[key]
     
     def clear(self) -> None:
         """

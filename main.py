@@ -7,124 +7,212 @@ from pyengine.graphics.light import DirectionalLight, PointLight
 from pyengine.graphics.material import Material
 from pyengine.graphics.mesh_renderer import MeshRenderer
 from pyengine.graphics.sprite import Animation, Animator, SpriteSheet
+from pyengine.gui.text_renderer import TextRenderer
 from pyengine.physics.transform import Transform
 
 
+# =============================================================================
+# CLASS: Game2D
+# Example of a 2D Top-Down
+# =============================================================================
 class Game2D(App):
     def startup(self):
+        """
+        Called once when the application starts.
+        Sets up the 2D scene, player, and camera.
+        """
         super().startup()
 
-        # 1. Load Shader
+        # 1. Load the Standard Shader
+        # We reuse the same shader for both 2D and 3D in this engine (it supports lighting and sprites).
         shader = self.resources.get_shader("shaders/mesh.vert", "shaders/mesh.frag")
 
+        # 2. Setup the 2D Camera
+        # Create an entity to hold the camera components.
         self.camera_entity = self.entity_manager.create_entity()
+        
+        # Position the camera at Z=1 to ensure it sees objects at Z=0.
         self.entity_manager.add_component(self.camera_entity, Transform(position=(0, 0, 1)))
+        
+        # Add the Camera2D component (Orthographic projection).
+        # ortho_size=5.0 means the screen shows 5 world units vertically.
         self.entity_manager.add_component(self.camera_entity, Camera2D(self.width, self.height, ortho_size=5.0))
+        
+        # Tag this camera as the Main Camera so the RenderSystem uses it.
         self.entity_manager.add_component(self.camera_entity, MainCamera())
 
-        # Create player
+        # 3. Create the Player Entity
+        # Load the sprite sheet texture.
         player_base = self.resources.get_texture("assets/player_base.png")
-        mat_player = Material(self.resources.get_shader("shaders/mesh.vert", "shaders/mesh.frag"), texture=player_base)
+        
+        # Create a material using the shader and the texture.
+        mat_player = Material(shader, texture=player_base)
+        
+        # Create a simple Rectangle geometry for the sprite.
         rect_geo = Rectangle(shader)
 
         player = self.entity_manager.create_entity()
+        
+        # Add Transform (position, rotation, scale).
         self.entity_manager.add_component(player, Transform())
+        
+        # Add MeshRenderer to draw the rectangle with the player texture.
         self.entity_manager.add_component(player, MeshRenderer(rect_geo, mat_player))
+        
+        # Add SpriteSheet component to handle UV mapping for animation frames.
+        # This specific asset has 56 rows and 9 columns.
         self.entity_manager.add_component(player, SpriteSheet(rows=56, cols=9))
 
+        # 4. Setup Animation
+        # Animator component manages the state of animations.
         player_animator = Animator()
+        
+        # Register an animation named "idle_down".
+        # Frames 0 to 5, playing at 0.1 seconds per frame.
         player_animator.add("idle_down", Animation(0, 5, 0.1))
+        
+        # Start playing the animation immediately.
         player_animator.play("idle_down")
+        
         self.entity_manager.add_component(player, player_animator)
 
 
+# =============================================================================
+# CLASS: Game3D
+# Example of a 3D Scene with lighting, primitives, loaded models, and UI.
+# =============================================================================
 class Game3D(App):
     def startup(self):
+        """
+        Called once when the application starts.
+        Sets up the 3D environment.
+        """
         super().startup()
         
+        # Lock the mouse cursor to the window and hide it.
+        # This is essential for FPS-style camera controls using mouse delta.
         SDL_SetRelativeMouseMode(SDL_TRUE)
 
-        # 1. Load Resources
+        # 1. Load Resources (Assets)
         shader = self.resources.get_shader("shaders/mesh.vert", "shaders/mesh.frag")
         
         # Load textures
         tex_logo = self.resources.get_texture("assets/logo.png")
         
+        # Create a shared material for basic objects
         mat_object = Material(shader, tex_logo)
 
-        # 2. Camera
+        # 2. Setup the 3D Camera
         self.camera_entity = self.entity_manager.create_entity()
+        
+        # Position the camera slightly up and back (0, 1, 3).
         self.entity_manager.add_component(self.camera_entity, Transform(position=(0, 1, 3)))
+        
+        # Add Camera3D component (Perspective projection). FOV is 70 degrees.
         self.entity_manager.add_component(self.camera_entity, Camera3D(self.width, self.height, fov=70.0))
         self.entity_manager.add_component(self.camera_entity, MainCamera())
 
-        # 3. Create Scene
+        # 3. Create Scene Objects (Primitives)
         
-        # --- FLOOR ---
+        # --- FLOOR (Plane) ---
+        # A large flat plane (20x20 units), texture repeats 5 times (tile_u/v).
         plane_geo = Plane(shader, width=20, depth=20, tile_u=5, tile_v=5)
         floor = self.entity_manager.create_entity()
         self.entity_manager.add_component(floor, Transform(position=(0, 0, 0)))
         self.entity_manager.add_component(floor, MeshRenderer(plane_geo, mat_object))
 
-        # --- SPHERE ---
+        # --- SPHERE (Left) ---
         sphere_geo = Sphere(shader, radius=0.5, sectors=32, stacks=16)
         sphere = self.entity_manager.create_entity()
-        self.entity_manager.add_component(sphere, Transform(position=(-1.5, 0.5, 0))) # Lift y by 0.5 (radius) to sit on floor
+        self.entity_manager.add_component(sphere, Transform(position=(-1.5, 0.5, 0))) # Lift y by radius (0.5)
         self.entity_manager.add_component(sphere, MeshRenderer(sphere_geo, mat_object))
 
-        # --- CYLINDER ---
+        # --- CYLINDER (Right) ---
         cyl_geo = Cylinder(shader, radius=0.5, height=1.5)
         cylinder = self.entity_manager.create_entity()
         self.entity_manager.add_component(cylinder, Transform(position=(1.5, 0.75, 0))) # Lift y by half height
         self.entity_manager.add_component(cylinder, MeshRenderer(cyl_geo, mat_object))
 
-        # --- CUBE (Middle) ---
+        # --- CUBE (Center) ---
         cube_geo = Cube(shader)
         cube = self.entity_manager.create_entity()
         self.entity_manager.add_component(cube, Transform(position=(0, 0.5, 0)))
         self.entity_manager.add_component(cube, MeshRenderer(cube_geo, mat_object))
 
+        # 4. Load External Model (OBJ)
         # --- Pyramid from obj file ---
-        # mesh_pyramid = self.resources.get_mesh("assets/pyramid.obj", shader)
-        # pyramid = self.entity_manager.create_entity()
-        # self.entity_manager.add_component(pyramid, Transform(position=(2.0, 0.5, 0.0)))
-        # self.entity_manager.add_component(pyramid, MeshRenderer(mesh_pyramid, mat_object))
-
-        # --- Pyramid from obj file ---
+        # load_model returns a list of (Mesh, Material) tuples because an OBJ can contain multiple parts.
         mesh_pyramid_part = self.resources.load_model("assets/pyramid.obj", shader)
+        
         for mesh, material in mesh_pyramid_part:
             part_entity = self.entity_manager.create_entity()
+            # Position it to the right
             self.entity_manager.add_component(part_entity, Transform(position=(3.0, 0.5, 0.0)))
             self.entity_manager.add_component(part_entity, MeshRenderer(mesh, material))
 
-        # --- LIGHTS ---
+        # 5. Setup Lighting
+        # Lighting is handled by adding specific components to entities.
 
-        # 1. Directional Light (Soleil / Lune)
+        # --- Directional Light (Sun/Moon) ---
         sun_entity = self.entity_manager.create_entity()
         self.entity_manager.add_component(sun_entity, DirectionalLight(
-            color=(0.5, 0.5, 0.8), # Bleuté (Nuit/Lune)
+            color=(0.5, 0.5, 0.8), # Bluish tint (Moonlight/Night)
             intensity=0.5,
-            direction=(0.5, -1.0, 0.0) # Vient du haut
+            direction=(0.5, -1.0, 0.0) # Light coming from above-right
         ))
 
-        # 2. Point Light (Feu de camp / Lampe Rouge)
+        # --- Point Light (Lamp/Fire) ---
         lamp_entity = self.entity_manager.create_entity()
-        self.entity_manager.add_component(lamp_entity, Transform(position=(2.5, 0.5, 1.0))) # Proche de la pyramide
+        # Position the light near the pyramid
+        self.entity_manager.add_component(lamp_entity, Transform(position=(2.5, 0.5, 1.0)))
         self.entity_manager.add_component(lamp_entity, PointLight(
-            color=(1.0, 0.2, 0.0), # Rouge/Orange
+            color=(1.0, 0.2, 0.0), # Orange/Red color
             intensity=2.0,
             radius=5.0
         ))
         
-        # Optionnel: Ajoute un petit Cube Blanc à la position de la lampe pour voir où elle est !
+        # (Optional) Visual Debug: Add a small white cube to visualize the light source position
         mesh_cube = Cube(shader)
-        mat_white = Material(shader, color=(1, 1, 1, 1)) # Pas de texture, juste blanc
+        mat_white = Material(shader, color=(1, 1, 1, 1)) # Pure white, no texture
         self.entity_manager.add_component(lamp_entity, MeshRenderer(mesh_cube, mat_white))
-        # Tu devras réduire l'échelle du cube de la lampe dans le transform (ex: scale=(0.2, 0.2, 0.2))
+        # Scale it down so it looks like a small bulb
         self.entity_manager.get_component(lamp_entity, Transform).scale = glm.vec3(0.2)
+
+        # 6. UI Setup (Text)
+        
+        # Load TrueType Font (Roboto)
+        font_roboto = self.resources.get_font("assets/roboto.ttf", 32) # Size 32pt
+
+        # Create Text Entity
+        self.text_entity = self.entity_manager.create_entity()
+        
+        # Position is in Screen Coordinates (Pixels).
+        # (65, 575) puts it roughly in the Top-Left corner (assuming 800x600 window).
+        self.entity_manager.add_component(self.text_entity, Transform(position=(65, 575, 0)))
+        
+        # Create TextRenderer component
+        text_comp = TextRenderer(font_roboto, "FPS: 0", color=(255, 255, 0)) # Yellow Text
+        
+        # Manually attach a material so RenderSystem can use the shader for the text quad.
+        # The texture is initially None; TextRenderer will generate it from the font.
+        text_comp.material = Material(shader, texture=None)
+        
+        self.entity_manager.add_component(self.text_entity, text_comp)
+
+    def temp_game_logic(self):
+        """
+        Called every frame. Used for simple logic before we have a full Scripting system.
+        """
+        super().temp_game_logic()
+
+        # Update FPS Text
+        # Retrieve the TextRenderer component and update its string.
+        text_comp = self.entity_manager.get_component(self.text_entity, TextRenderer)
+        if text_comp:
+            text_comp.text = f"FPS: {self.time.fps}"
 
 
 if __name__ == "__main__":
+    # Create and run the 3D Game
     app = Game3D(800, 600, "Pyengine")
     app.run()
-    
