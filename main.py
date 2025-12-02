@@ -1,7 +1,9 @@
+import glm
 from sdl2 import SDL_SetRelativeMouseMode, SDL_TRUE
 from pyengine.core.app import App
 from pyengine.gl_utils.mesh import Cylinder, Plane, Rectangle, Cube, Sphere
 from pyengine.graphics.camera import Camera2D, Camera3D, MainCamera
+from pyengine.graphics.light import DirectionalLight, PointLight
 from pyengine.graphics.material import Material
 from pyengine.graphics.mesh_renderer import MeshRenderer
 from pyengine.graphics.sprite import Animation, Animator, SpriteSheet
@@ -94,6 +96,32 @@ class Game3D(App):
             part_entity = self.entity_manager.create_entity()
             self.entity_manager.add_component(part_entity, Transform(position=(3.0, 0.5, 0.0)))
             self.entity_manager.add_component(part_entity, MeshRenderer(mesh, material))
+
+        # --- LIGHTS ---
+
+        # 1. Directional Light (Soleil / Lune)
+        sun_entity = self.entity_manager.create_entity()
+        self.entity_manager.add_component(sun_entity, DirectionalLight(
+            color=(0.5, 0.5, 0.8), # Bleuté (Nuit/Lune)
+            intensity=0.5,
+            direction=(0.5, -1.0, 0.0) # Vient du haut
+        ))
+
+        # 2. Point Light (Feu de camp / Lampe Rouge)
+        lamp_entity = self.entity_manager.create_entity()
+        self.entity_manager.add_component(lamp_entity, Transform(position=(2.5, 0.5, 1.0))) # Proche de la pyramide
+        self.entity_manager.add_component(lamp_entity, PointLight(
+            color=(1.0, 0.2, 0.0), # Rouge/Orange
+            intensity=2.0,
+            radius=5.0
+        ))
+        
+        # Optionnel: Ajoute un petit Cube Blanc à la position de la lampe pour voir où elle est !
+        mesh_cube = Cube(shader)
+        mat_white = Material(shader, color=(1, 1, 1, 1)) # Pas de texture, juste blanc
+        self.entity_manager.add_component(lamp_entity, MeshRenderer(mesh_cube, mat_white))
+        # Tu devras réduire l'échelle du cube de la lampe dans le transform (ex: scale=(0.2, 0.2, 0.2))
+        self.entity_manager.get_component(lamp_entity, Transform).scale = glm.vec3(0.2)
 
 
 if __name__ == "__main__":

@@ -7,6 +7,7 @@ from pyengine.graphics.mesh_renderer import MeshRenderer
 from pyengine.graphics.camera import Camera2D, Camera3D, MainCamera
 from pyengine.graphics.material import Material
 from pyengine.graphics.sprite import SpriteSheet
+from pyengine.graphics.light import DirectionalLight, PointLight
 
 
 class RenderSystem:
@@ -25,6 +26,23 @@ class RenderSystem:
         else:
             glUniform1i(loc_use_tex, 0)
             glBindTexture(GL_TEXTURE_2D, 0)
+
+    def _upload_dir_light(self, shader, light: DirectionalLight):
+        # Helper to upload uniform struct
+        glUniform3f(glGetUniformLocation(shader.id, "u_dirLight.direction"), *light.direction)
+        glUniform3f(glGetUniformLocation(shader.id, "u_dirLight.color"), *light.color)
+        glUniform1f(glGetUniformLocation(shader.id, "u_dirLight.intensity"), light.intensity)
+
+    def _upload_point_light(self, shader, index: int, light: PointLight, transform: Transform):
+        # Helper to construct array strings: u_pointLights[0].position
+        base = f"u_pointLights[{index}]"
+        
+        glUniform3f(glGetUniformLocation(shader.id, f"{base}.position"), *transform.position)
+        glUniform3f(glGetUniformLocation(shader.id, f"{base}.color"), *light.color)
+        glUniform1f(glGetUniformLocation(shader.id, f"{base}.intensity"), light.intensity)
+        glUniform1f(glGetUniformLocation(shader.id, f"{base}.constant"), light.constant)
+        glUniform1f(glGetUniformLocation(shader.id, f"{base}.linear"), light.linear)
+        glUniform1f(glGetUniformLocation(shader.id, f"{base}.quadratic"), light.quadratic)
 
     def update(self, entity_manager: EntityManager):
         glClearColor(0.1, 0.1, 0.2, 1.0)
@@ -70,6 +88,20 @@ class RenderSystem:
         view_matrix = camera_component.get_view_matrix(camera_transform)
         proj_matrix = camera_component.get_projection_matrix()
 
+        # --- LIGHTING SETUP (NEW) ---
+        
+        # 1. Find Directional Light (Only 1 supported in this shader version)
+        dir_light = None
+        for _, (l,) in entity_manager.get_entities_with(DirectionalLight):
+            dir_light = l
+            break # Take the first one found
+        
+        # 2. Find Point Lights
+        point_lights = []
+        for _, (l, t) in entity_manager.get_entities_with(PointLight, Transform):
+            point_lights.append((l, t))
+            if len(point_lights) >= 4: break # Max 4 lights
+
         for entity, (transform, renderer) in entity_manager.get_entities_with(Transform, MeshRenderer):
             
             # Accès via le material
@@ -80,6 +112,25 @@ class RenderSystem:
 
             # --- 1. Material Properties (Texture & Color) ---
             self._bind_material(material)
+
+            # --- UPLOAD LIGHT UNIFORMS ---
+            
+            # Ambient
+            loc_amb = glGetUniformLocation(material.shader.id, "u_ambientColor")
+            glUniform3f(loc_amb, 0.1, 0.1, 0.1) # Soft global ambient
+
+            # Directional Light
+            if dir_light:
+                self._upload_dir_light(material.shader, dir_light)
+            else:
+                # Disable dir light (intensity 0)
+                glUniform1f(glGetUniformLocation(material.shader.id, "u_dirLight.intensity"), 0.0)
+
+            # Point Lights
+            glUniform1i(glGetUniformLocation(material.shader.id, "u_pointLightCount"), len(point_lights))
+            
+            for i, (light, light_trans) in enumerate(point_lights):
+                self._upload_point_light(material.shader, i, light, light_trans)
 
             # Check if this entity has a SpriteSheet component
             sprite_sheet = entity_manager.get_component(entity, SpriteSheet)
