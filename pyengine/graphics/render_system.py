@@ -2,6 +2,7 @@ import glm
 from OpenGL.GL import *
 from pyengine.core.logger import Logger
 from pyengine.ecs.entity_manager import EntityManager
+from pyengine.gui.ui_box import UIBox
 from pyengine.physics.transform import Transform
 from pyengine.graphics.mesh_renderer import MeshRenderer
 from pyengine.graphics.camera import Camera2D, Camera3D, MainCamera
@@ -13,9 +14,8 @@ from pyengine.gl_utils.mesh import Rectangle
 
 class RenderSystem:
     def __init__(self):
-        # We need a reusable mesh for UI (a simple quad).
-        # We initialize it lazily because we need an active shader to create the VAO.
-        self.ui_mesh = None
+        self.box_mesh = None  # Uses ui.vert (No Normals)
+        self.text_mesh = None # Uses mesh.vert (With Normals)
 
     def update(self, entity_manager: EntityManager):
         """
@@ -128,51 +128,76 @@ class RenderSystem:
 
     def _render_ui_pass(self, entity_manager: EntityManager):
         """
-        Handles the rendering of UI elements (Text, etc.) on top of the world.
+        Handles the rendering of UI elements using separate meshes to prevent VAO conflicts.
         """
-        # Configure OpenGL for UI
-        glDisable(GL_DEPTH_TEST) # Always on top
+        glDisable(GL_DEPTH_TEST)
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
-        # Get Viewport for Orthographic projection (Pixel Coordinates)
         viewport = glGetIntegerv(GL_VIEWPORT)
         width, height = viewport[2], viewport[3]
         ui_projection = glm.ortho(0.0, width, 0.0, height)
-        ui_view = glm.mat4(1.0) # Identity view
+        ui_view = glm.mat4(1.0)
 
-        for entity, (transform, text_renderer) in entity_manager.get_entities_with(Transform, TextRenderer):
+        # ---------------------------------------------------------
+        # 1. RENDER UI BOXES (Using self.box_mesh)
+        # ---------------------------------------------------------
+        for entity, (transform, ui_box) in entity_manager.get_entities_with(Transform, UIBox):
+            if not ui_box.material: continue
             
-            # 1. Update Texture if dirty (Text changed)
+            shader = ui_box.material.shader
+            shader.use()
+            
+            # Init box mesh if needed
+            if self.box_mesh is None: 
+                self.box_mesh = Rectangle(shader)
+
+            # Uniforms
+            glUniformMatrix4fv(glGetUniformLocation(shader.id, "u_view"), 1, GL_FALSE, glm.value_ptr(ui_view))
+            glUniformMatrix4fv(glGetUniformLocation(shader.id, "u_projection"), 1, GL_FALSE, glm.value_ptr(ui_projection))
+            glUniform4f(glGetUniformLocation(shader.id, "u_color"), *ui_box.color)
+            glUniform2f(glGetUniformLocation(shader.id, "u_dimensions"), ui_box.width, ui_box.height)
+            glUniform1f(glGetUniformLocation(shader.id, "u_radius"), ui_box.border_radius)
+
+            # Transform
+            model = glm.mat4(1.0)
+            model = glm.translate(model, transform.position)
+            model = glm.scale(model, glm.vec3(ui_box.width, ui_box.height, 1.0))
+            glUniformMatrix4fv(glGetUniformLocation(shader.id, "u_model"), 1, GL_FALSE, glm.value_ptr(model))
+
+            self.box_mesh.bind()
+            glDrawArrays(GL_TRIANGLES, 0, self.box_mesh.count)
+            self.box_mesh.unbind()
+            shader.unuse()
+
+        # ---------------------------------------------------------
+        # 2. RENDER TEXT (Using self.text_mesh)
+        # ---------------------------------------------------------
+        for entity, (transform, text_renderer) in entity_manager.get_entities_with(Transform, TextRenderer):
             if text_renderer.is_dirty:
-                if text_renderer.texture:
-                    text_renderer.texture.destroy()
+                if text_renderer.texture: text_renderer.texture.destroy()
                 text_renderer.texture = text_renderer.font.render_text(text_renderer.text, text_renderer.color)
                 text_renderer.is_dirty = False
-                
-                # Setup Material if missing (Assuming simple shader)
-                # Note: In a real engine, use a dedicated UI shader.
-                if not text_renderer.material and text_renderer.texture:
-                    # We need to ensure we have a material to render
-                    pass 
+                # If using generic material from main.py, it's fine.
 
-            if not text_renderer.texture or not text_renderer.material:
-                continue
+            if not text_renderer.texture or not text_renderer.material: continue
 
             shader = text_renderer.material.shader
             shader.use()
 
-            # 2. Bind Texture manually for UI
+            # Init text mesh if needed
+            if self.text_mesh is None: 
+                self.text_mesh = Rectangle(shader)
+
+            # Bind Texture
             glActiveTexture(GL_TEXTURE0)
             glBindTexture(GL_TEXTURE_2D, text_renderer.texture.id)
             glUniform1i(glGetUniformLocation(shader.id, "u_texture"), 0)
             glUniform1i(glGetUniformLocation(shader.id, "u_use_texture"), 1)
-            # Force white tint so text color comes from texture (SDL_ttf)
             glUniform4f(glGetUniformLocation(shader.id, "u_color"), 1, 1, 1, 1)
 
-            # 3. Disable Lighting for UI
-            # We explicitly turn off lights so text isn't affected by sun/lamps
-            glUniform3f(glGetUniformLocation(shader.id, "u_ambientColor"), 1, 1, 1) # Full Bright
+            # Disable Lights for Text
+            glUniform3f(glGetUniformLocation(shader.id, "u_ambientColor"), 1, 1, 1)
             glUniform1f(glGetUniformLocation(shader.id, "u_dirLight.intensity"), 0.0)
             glUniform1i(glGetUniformLocation(shader.id, "u_pointLightCount"), 0)
             
@@ -180,24 +205,18 @@ class RenderSystem:
             glUniform2f(glGetUniformLocation(shader.id, "u_uv_scale"), 1.0, 1.0)
             glUniform2f(glGetUniformLocation(shader.id, "u_uv_offset"), 0.0, 0.0)
 
-            # 4. Matrices (Screen Space)
+            # Transform
             shader.set_uniform_matrix("u_view", ui_view)
             shader.set_uniform_matrix("u_projection", ui_projection)
-
-            # Model Matrix: Scale quad to match texture size
             model = glm.mat4(1.0)
             model = glm.translate(model, transform.position)
             model = glm.scale(model, glm.vec3(text_renderer.texture.width, text_renderer.texture.height, 1.0))
-            model = glm.scale(model, transform.scale) # User scale
+            model = glm.scale(model, transform.scale)
             shader.set_uniform_matrix("u_model", model)
 
-            # 5. Draw Quad
-            if self.ui_mesh is None:
-                self.ui_mesh = Rectangle(shader)
-            
-            self.ui_mesh.bind()
-            glDrawArrays(GL_TRIANGLES, 0, self.ui_mesh.count)
-            self.ui_mesh.unbind()
+            self.text_mesh.bind()
+            glDrawArrays(GL_TRIANGLES, 0, self.text_mesh.count)
+            self.text_mesh.unbind()
             shader.unuse()
 
     # =========================================================================

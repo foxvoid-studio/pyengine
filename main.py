@@ -8,6 +8,7 @@ from pyengine.graphics.material import Material
 from pyengine.graphics.mesh_renderer import MeshRenderer
 from pyengine.graphics.sprite import Animation, Animator, SpriteSheet
 from pyengine.gui.text_renderer import TextRenderer
+from pyengine.gui.ui_box import UIBox
 from pyengine.physics.transform import Transform
 
 
@@ -95,6 +96,7 @@ class Game3D(App):
 
         # 1. Load Resources (Assets)
         shader = self.resources.get_shader("shaders/mesh.vert", "shaders/mesh.frag")
+        ui_shader = self.resources.get_shader("shaders/ui.vert", "shaders/ui.frag") # <--- NEW: Load UI Shader
         
         # Load textures
         tex_logo = self.resources.get_texture("assets/logo.png")
@@ -178,17 +180,38 @@ class Game3D(App):
         # Scale it down so it looks like a small bulb
         self.entity_manager.get_component(lamp_entity, Transform).scale = glm.vec3(0.2)
 
-        # 6. UI Setup (Text)
+        # 6. UI Setup (Text & Box)
         
         # Load TrueType Font (Roboto)
         font_roboto = self.resources.get_font("assets/roboto.ttf", 32) # Size 32pt
 
-        # Create Text Entity
+        # --- UI Box (Background Panel) ---
+        self.panel_entity = self.entity_manager.create_entity()
+        
+        # Center Position for the box (Screen Coordinates)
+        # Assuming window is 800x600, top-left area. 
+        # X=90, Y=575 (near top)
+        box_pos = (90, 575, 0)
+        self.entity_manager.add_component(self.panel_entity, Transform(position=box_pos))
+        
+        # Create the UIBox component
+        # width=160px, height=50px, Dark gray semi-transparent, Rounded corners
+        ui_box = UIBox(width=160, height=50, color=(0.1, 0.1, 0.1, 0.7), border_radius=10.0)
+        
+        # Assign the UI Shader (Critical for the rounded rect logic)
+        ui_box.material = Material(ui_shader)
+        
+        self.entity_manager.add_component(self.panel_entity, ui_box)
+
+        # --- FPS Text ---
         self.text_entity = self.entity_manager.create_entity()
         
         # Position is in Screen Coordinates (Pixels).
-        # (65, 575) puts it roughly in the Top-Left corner (assuming 800x600 window).
-        self.entity_manager.add_component(self.text_entity, Transform(position=(65, 575, 0)))
+        # We put the text at the same position (center of the box) because 
+        # RenderSystem centers the quad geometry.
+        # Note: If text looks off-center, you might need to adjust offsets manually
+        # since text alignment depends on the generated texture size.
+        self.entity_manager.add_component(self.text_entity, Transform(position=box_pos))
         
         # Create TextRenderer component
         text_comp = TextRenderer(font_roboto, "FPS: 0", color=(255, 255, 0)) # Yellow Text
