@@ -235,7 +235,50 @@ class Game3D(App):
             text_comp.text = f"FPS: {self.time.fps}"
 
 
+class KenneyGame(App):
+    def startup(self):
+        super().startup()
+
+        SDL_SetRelativeMouseMode(SDL_TRUE)
+
+        shader = self.resources.get_shader("shaders/mesh.vert", "shaders/mesh.frag")
+
+        self.camera_entity = self.entity_manager.create_entity()
+        self.entity_manager.add_component(self.camera_entity, Transform(position=(0, 1, 3)))
+        self.entity_manager.add_component(self.camera_entity, Camera3D(self.width, self.height, fov=70.0))
+        self.entity_manager.add_component(self.camera_entity, MainCamera())
+
+        block_grass_model = self.resources.load_model("assets/kenney/block-grass.obj", shader)
+
+        for mesh, material in block_grass_model:
+            part_entity = self.entity_manager.create_entity()
+            self.entity_manager.add_component(part_entity, Transform(position=(3.0, 0.5, 0.0)))
+            self.entity_manager.add_component(part_entity, MeshRenderer(mesh, material))
+
+        sun_entity = self.entity_manager.create_entity()
+        self.entity_manager.add_component(sun_entity, DirectionalLight(
+            color=(0.5, 0.5, 0.8), # Bluish tint (Moonlight/Night)
+            intensity=0.5,
+            direction=(0.5, -1.0, 0.0) # Light coming from above-right
+        ))
+
+        font_roboto = self.resources.get_font("assets/roboto.ttf", 32) # Size 32pt
+
+        self.text_entity = self.entity_manager.create_entity()
+        self.entity_manager.add_component(self.text_entity, Transform(position=(90, 575, 0)))
+        text_comp = TextRenderer(font_roboto, "FPS: 0", color=(255, 255, 0))
+        text_comp.material = Material(shader, texture=None)
+
+        self.entity_manager.add_component(self.text_entity, text_comp)
+
+    def temp_game_logic(self):
+        super().temp_game_logic()
+
+        text_comp = self.entity_manager.get_component(self.text_entity, TextRenderer)
+        if text_comp:
+            text_comp.text = f"FPS: {self.time.fps}"
+
 if __name__ == "__main__":
     # Create and run the 3D Game
-    app = Game3D(800, 600, "Pyengine")
+    app = KenneyGame(800, 600, "Pyengine")
     app.run()
