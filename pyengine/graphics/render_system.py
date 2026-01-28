@@ -11,16 +11,25 @@ from pyengine.graphics.sprite import SpriteSheet
 from pyengine.graphics.light import DirectionalLight, PointLight
 from pyengine.gui.text_renderer import TextRenderer
 from pyengine.gl_utils.mesh import Rectangle
+from pyengine.ecs.system import System
+from pyengine.ecs.resource import ResourceManager
 
-class RenderSystem:
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pyengine.core.app import App
+
+class RenderSystem(System):
     def __init__(self):
         self.box_mesh = None  # Uses ui.vert (No Normals)
         self.text_mesh = None # Uses mesh.vert (With Normals)
 
-    def update(self, entity_manager: EntityManager):
+    def update(self, resources: ResourceManager):
         """
         Main rendering loop orchestration.
         """
+        entity_manager: EntityManager = resources.get(EntityManager)
+
         # 1. Clear Screen
         glClearColor(0.1, 0.1, 0.2, 1.0)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)

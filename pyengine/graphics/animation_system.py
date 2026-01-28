@@ -1,9 +1,14 @@
 from pyengine.ecs.entity_manager import EntityManager
 from pyengine.graphics.sprite import SpriteSheet, Animator
 from pyengine.core.time_manager import TimeManager
+from pyengine.ecs.system import System
+from pyengine.ecs.resource import ResourceManager
 
-class AnimationSystem:
-    def update(self, entity_manager: EntityManager, time_manager: TimeManager):
+class AnimationSystem(System):
+    def update(self, resource: ResourceManager):
+        entity_manager: EntityManager = resource.get(EntityManager)
+        time_manager: TimeManager = resource.get(TimeManager)
+
         dt = time_manager.delta_time
 
         for _, (sprite, animator) in entity_manager.get_entities_with(SpriteSheet, Animator):

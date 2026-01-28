@@ -9,9 +9,11 @@ from pyengine.ecs.entity_manager import EntityManager
 from pyengine.graphics.render_system import RenderSystem
 from pyengine.core.input_manager import InputManager
 from pyengine.core.time_manager import TimeManager
-from pyengine.core.resource_manager import ResourceManager
+from pyengine.core.asset_manager import AssetManager
 from pyengine.graphics.camera import Camera2D, Camera3D
 from pyengine.graphics.animation_system import AnimationSystem
+from pyengine.ecs.scheduler import SystemScheduler, SchedulerType
+from pyengine.ecs.resource import ResourceManager
 
 
 # =============================================================================
@@ -31,14 +33,22 @@ class App:
         self.height = height
         self.running = False
         self._init_sdl()
-        
+
         self.input = InputManager()
         self.time = TimeManager()
-        self.resources = ResourceManager()
+        self.assets = AssetManager()
         self.entity_manager = EntityManager()
 
-        self.animation_system = AnimationSystem()
-        self.render_system = RenderSystem()
+        self.resources = ResourceManager()
+        self.resources.add(self.input)
+        self.resources.add(self.time)
+        self.resources.add(self.assets)
+        self.resources.add(self.entity_manager)
+
+        self.scheduler = SystemScheduler()
+
+        self.scheduler.add(SchedulerType.Update, AnimationSystem())
+        self.scheduler.add(SchedulerType.Render, RenderSystem())
 
         self.camera_entity = None
         
@@ -133,6 +143,8 @@ class App:
         The main application loop.
         """
         self.running = True
+
+        self.scheduler.execute(SchedulerType.StartUp, self.resources)
         
         while self.running:
             # 1. Update Time (Must be first)
@@ -147,10 +159,10 @@ class App:
             self.temp_game_logic()
 
             # Update Animations BEFORE Rendering
-            self.animation_system.update(self.entity_manager, self.time)
+            self.scheduler.execute(SchedulerType.Update, self.resources)
 
             # Render
-            self.render_system.update(self.entity_manager)
+            self.scheduler.execute(SchedulerType.Render, self.resources)
 
             # Swap the buffers (Display the newly drawn frame)
             SDL_GL_SwapWindow(self.window)

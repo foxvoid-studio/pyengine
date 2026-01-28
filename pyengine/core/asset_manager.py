@@ -9,7 +9,7 @@ from pyengine.graphics.material import Material
 from pyengine.gui.font import Font
 
 
-class ResourceManager:
+class AssetManager:
     """
     Centralized manager to load and store assets.
     Prevents loading the same asset multiple times (Caching).

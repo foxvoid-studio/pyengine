@@ -1,11 +1,12 @@
 from typing import Dict, Type, TypeVar, Optional, Generator, Tuple
 from pyengine.ecs.component import Component
+from pyengine.ecs.resource import Resource
 
 # We define a generic type "T".
 # "bound=Component" means T must be Component or a subclass of Component.
 T = TypeVar("T", bound=Component)
 
-class EntityManager:
+class EntityManager(Resource):
     def __init__(self):
         self.next_id = 0
         # Corrected key type from 'str' to 'Type[Component]' to match logic

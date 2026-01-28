@@ -26,7 +26,7 @@ class Game2D(App):
 
         # 1. Load the Standard Shader
         # We reuse the same shader for both 2D and 3D in this engine (it supports lighting and sprites).
-        shader = self.resources.get_shader("shaders/mesh.vert", "shaders/mesh.frag")
+        shader = self.assets.get_shader("shaders/mesh.vert", "shaders/mesh.frag")
 
         # 2. Setup the 2D Camera
         # Create an entity to hold the camera components.
@@ -44,7 +44,7 @@ class Game2D(App):
 
         # 3. Create the Player Entity
         # Load the sprite sheet texture.
-        player_base = self.resources.get_texture("assets/player_base.png")
+        player_base = self.assets.get_texture("assets/player_base.png")
         
         # Create a material using the shader and the texture.
         mat_player = Material(shader, texture=player_base)
@@ -95,11 +95,11 @@ class Game3D(App):
         SDL_SetRelativeMouseMode(SDL_TRUE)
 
         # 1. Load Resources (Assets)
-        shader = self.resources.get_shader("shaders/mesh.vert", "shaders/mesh.frag")
-        ui_shader = self.resources.get_shader("shaders/ui.vert", "shaders/ui.frag") # <--- NEW: Load UI Shader
+        shader = self.assets.get_shader("shaders/mesh.vert", "shaders/mesh.frag")
+        ui_shader = self.assets.get_shader("shaders/ui.vert", "shaders/ui.frag") # <--- NEW: Load UI Shader
         
         # Load textures
-        tex_logo = self.resources.get_texture("assets/logo.png")
+        tex_logo = self.assets.get_texture("assets/logo.png")
         
         # Create a shared material for basic objects
         mat_object = Material(shader, tex_logo)
@@ -144,7 +144,7 @@ class Game3D(App):
         # 4. Load External Model (OBJ)
         # --- Pyramid from obj file ---
         # load_model returns a list of (Mesh, Material) tuples because an OBJ can contain multiple parts.
-        mesh_pyramid_part = self.resources.load_model("assets/pyramid.obj", shader)
+        mesh_pyramid_part = self.assets.load_model("assets/pyramid.obj", shader)
         
         for mesh, material in mesh_pyramid_part:
             part_entity = self.entity_manager.create_entity()
@@ -183,7 +183,7 @@ class Game3D(App):
         # 6. UI Setup (Text & Box)
         
         # Load TrueType Font (Roboto)
-        font_roboto = self.resources.get_font("assets/roboto.ttf", 32) # Size 32pt
+        font_roboto = self.assets.get_font("assets/roboto.ttf", 32) # Size 32pt
 
         # --- UI Box (Background Panel) ---
         self.panel_entity = self.entity_manager.create_entity()
@@ -241,14 +241,14 @@ class KenneyGame(App):
 
         SDL_SetRelativeMouseMode(SDL_TRUE)
 
-        shader = self.resources.get_shader("shaders/mesh.vert", "shaders/mesh.frag")
+        shader = self.assets.get_shader("shaders/mesh.vert", "shaders/mesh.frag")
 
         self.camera_entity = self.entity_manager.create_entity()
         self.entity_manager.add_component(self.camera_entity, Transform(position=(0, 1, 3)))
         self.entity_manager.add_component(self.camera_entity, Camera3D(self.width, self.height, fov=70.0))
         self.entity_manager.add_component(self.camera_entity, MainCamera())
 
-        block_grass_model = self.resources.load_model("assets/kenney/block-grass.obj", shader)
+        block_grass_model = self.assets.load_model("assets/kenney/block-grass.obj", shader)
 
         for mesh, material in block_grass_model:
             part_entity = self.entity_manager.create_entity()
@@ -262,7 +262,7 @@ class KenneyGame(App):
             direction=(0.5, -1.0, 0.0) # Light coming from above-right
         ))
 
-        font_roboto = self.resources.get_font("assets/roboto.ttf", 32) # Size 32pt
+        font_roboto = self.assets.get_font("assets/roboto.ttf", 32) # Size 32pt
 
         self.text_entity = self.entity_manager.create_entity()
         self.entity_manager.add_component(self.text_entity, Transform(position=(90, 575, 0)))
