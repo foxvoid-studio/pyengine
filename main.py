@@ -1,5 +1,7 @@
 import glm
-from sdl2 import SDL_SetRelativeMouseMode, SDL_TRUE
+import sys
+import ctypes
+from sdl2 import *
 from pyengine.core.app import App
 from pyengine.gl_utils.mesh import Cylinder, Plane, Rectangle, Cube, Sphere
 from pyengine.graphics.camera import Camera2D, Camera3D, MainCamera
@@ -10,6 +12,84 @@ from pyengine.graphics.sprite import Animation, Animator, SpriteSheet
 from pyengine.gui.text_renderer import TextRenderer
 from pyengine.gui.ui_box import UIBox
 from pyengine.physics.transform import Transform
+from pyengine.ecs.system import System
+from pyengine.ecs.scheduler import SchedulerType
+from pyengine.ecs.resource import ResourceManager
+from pyengine.core.time_manager import TimeManager
+from pyengine.ecs.entity_manager import EntityManager
+from pyengine.core.input_manager import InputManager
+from pyengine.ecs.component import Component
+
+
+class Camera2dController(System):
+    def update(self, resources: ResourceManager):
+        time_manager: TimeManager = resources.get(TimeManager)
+        entity_manager: EntityManager = resources.get(EntityManager)
+        input_manager: InputManager = resources.get(InputManager)
+
+        dt = time_manager.delta_time
+        for (_, (transform, camera_2d, _)) in entity_manager.get_entities_with(Transform, Camera2D, MainCamera):
+            scroll = input_manager.get_mouse_wheel()
+            if scroll != 0:
+                camera_2d.zoom += scroll * 0.5
+                if camera_2d.zoom < 0.1:
+                    camera_2d.zoom = 0.1
+
+            cam_speed = 5.0 * dt
+
+            if input_manager.is_key_down(SDLK_z): transform.position.y += cam_speed
+            if input_manager.is_key_down(SDLK_s): transform.position.y -= cam_speed
+            if input_manager.is_key_down(SDLK_q): transform.position.x -= cam_speed
+            if input_manager.is_key_down(SDLK_d): transform.position.x += cam_speed
+
+
+class Camera3dController(System):
+    def update(self, resources: ResourceManager):
+        time_manager: TimeManager = resources.get(TimeManager)
+        entity_manager: EntityManager = resources.get(EntityManager)
+        input_manager: InputManager = resources.get(InputManager)
+
+        dt = time_manager.delta_time
+        for (_, (transform, camera_3d, _)) in entity_manager.get_entities_with(Transform, Camera3D, MainCamera):
+            x_rel, y_rel = ctypes.c_int(0), ctypes.c_int(0)
+            SDL_GetRelativeMouseState(ctypes.byref(x_rel), ctypes.byref(y_rel))
+            camera_3d.process_mouse_movement(x_rel.value, -y_rel.value)
+
+            move_speed = 5.0 * dt
+
+            if input_manager.is_key_down(SDLK_z):
+                transform.position += camera_3d.front * move_speed
+            if input_manager.is_key_down(SDLK_s):
+                transform.position -= camera_3d.front * move_speed
+            if input_manager.is_key_down(SDLK_q):
+                transform.position -= camera_3d.right * move_speed
+            if input_manager.is_key_down(SDLK_d):
+                transform.position += camera_3d.right * move_speed
+
+            if input_manager.is_key_down(SDLK_SPACE):
+                transform.position.y += move_speed
+            if input_manager.is_key_down(SDLK_LSHIFT):
+                transform.position.y -= move_speed
+
+
+class ExitSystem(System):
+    def update(self, resources: ResourceManager):
+        input_manager: InputManager = resources.get(InputManager)
+        if input_manager.is_key_pressed(SDLK_ESCAPE):
+            SDL_Quit()
+            sys.exit()
+
+
+class FpsDisplay(Component): ...
+
+
+class FpsDisplaySystem(System):
+    def update(self, resources: ResourceManager):
+        entity_manager: EntityManager = resources.get(EntityManager)
+        time_manager: TimeManager = resources.get(TimeManager)
+
+        for (_, (text_renderer, _)) in entity_manager.get_entities_with(TextRenderer, FpsDisplay):
+            text_renderer.text = f"FPS: {time_manager.fps}"
 
 
 # =============================================================================
@@ -23,6 +103,9 @@ class Game2D(App):
         Sets up the 2D scene, player, and camera.
         """
         super().startup()
+
+        self.scheduler.add(SchedulerType.Update, Camera2dController())
+        self.scheduler.add(SchedulerType.Update, ExitSystem())
 
         # 1. Load the Standard Shader
         # We reuse the same shader for both 2D and 3D in this engine (it supports lighting and sprites).
@@ -89,6 +172,10 @@ class Game3D(App):
         Sets up the 3D environment.
         """
         super().startup()
+
+        self.scheduler.add(SchedulerType.Update, Camera3dController())
+        self.scheduler.add(SchedulerType.Update, ExitSystem())
+        self.scheduler.add(SchedulerType.Update, FpsDisplaySystem())
         
         # Lock the mouse cursor to the window and hide it.
         # This is essential for FPS-style camera controls using mouse delta.
@@ -204,14 +291,14 @@ class Game3D(App):
         self.entity_manager.add_component(self.panel_entity, ui_box)
 
         # --- FPS Text ---
-        self.text_entity = self.entity_manager.create_entity()
+        text_entity = self.entity_manager.create_entity()
         
         # Position is in Screen Coordinates (Pixels).
         # We put the text at the same position (center of the box) because 
         # RenderSystem centers the quad geometry.
         # Note: If text looks off-center, you might need to adjust offsets manually
         # since text alignment depends on the generated texture size.
-        self.entity_manager.add_component(self.text_entity, Transform(position=box_pos))
+        self.entity_manager.add_component(text_entity, Transform(position=box_pos))
         
         # Create TextRenderer component
         text_comp = TextRenderer(font_roboto, "FPS: 0", color=(255, 255, 0)) # Yellow Text
@@ -220,24 +307,17 @@ class Game3D(App):
         # The texture is initially None; TextRenderer will generate it from the font.
         text_comp.material = Material(shader, texture=None)
         
-        self.entity_manager.add_component(self.text_entity, text_comp)
-
-    def temp_game_logic(self):
-        """
-        Called every frame. Used for simple logic before we have a full Scripting system.
-        """
-        super().temp_game_logic()
-
-        # Update FPS Text
-        # Retrieve the TextRenderer component and update its string.
-        text_comp = self.entity_manager.get_component(self.text_entity, TextRenderer)
-        if text_comp:
-            text_comp.text = f"FPS: {self.time.fps}"
+        self.entity_manager.add_component(text_entity, text_comp)
+        self.entity_manager.add_component(text_entity, FpsDisplay())
 
 
 class KenneyGame(App):
     def startup(self):
         super().startup()
+
+        self.scheduler.add(SchedulerType.Update, Camera3dController())
+        self.scheduler.add(SchedulerType.Update, ExitSystem())
+        self.scheduler.add(SchedulerType.Update, FpsDisplaySystem())
 
         SDL_SetRelativeMouseMode(SDL_TRUE)
 
@@ -264,19 +344,14 @@ class KenneyGame(App):
 
         font_roboto = self.assets.get_font("assets/roboto.ttf", 32) # Size 32pt
 
-        self.text_entity = self.entity_manager.create_entity()
-        self.entity_manager.add_component(self.text_entity, Transform(position=(90, 575, 0)))
+        text_entity = self.entity_manager.create_entity()
+        self.entity_manager.add_component(text_entity, Transform(position=(90, 575, 0)))
         text_comp = TextRenderer(font_roboto, "FPS: 0", color=(255, 255, 0))
         text_comp.material = Material(shader, texture=None)
 
-        self.entity_manager.add_component(self.text_entity, text_comp)
+        self.entity_manager.add_component(text_entity, text_comp)
+        self.entity_manager.add_component(text_entity, FpsDisplay())
 
-    def temp_game_logic(self):
-        super().temp_game_logic()
-
-        text_comp = self.entity_manager.get_component(self.text_entity, TextRenderer)
-        if text_comp:
-            text_comp.text = f"FPS: {self.time.fps}"
 
 if __name__ == "__main__":
     # Create and run the 3D Game
