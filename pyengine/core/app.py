@@ -4,16 +4,16 @@ import sdl2.sdlttf
 from sdl2 import *
 from OpenGL.GL import *
 from pyengine.core.logger import Logger
-from pyengine.physics.transform import Transform
 from pyengine.ecs.entity_manager import EntityManager
 from pyengine.graphics.render_system import RenderSystem
 from pyengine.core.input_manager import InputManager
 from pyengine.core.time_manager import TimeManager
 from pyengine.core.asset_manager import AssetManager
 from pyengine.graphics.camera import Camera2D, Camera3D
-from pyengine.graphics.animation_system import AnimationSystem
+from pyengine.graphics.animation_system import Animation2dSystem
 from pyengine.ecs.scheduler import SystemScheduler, SchedulerType
 from pyengine.ecs.resource import ResourceManager
+from pyengine.ecs.plugin import Plugin
 
 
 # =============================================================================
@@ -47,7 +47,7 @@ class App:
 
         self.scheduler = SystemScheduler()
 
-        self.scheduler.add(SchedulerType.Update, AnimationSystem())
+        self.scheduler.add(SchedulerType.Update, Animation2dSystem())
         self.scheduler.add(SchedulerType.Render, RenderSystem())
 
         self.camera_entity = None
@@ -99,6 +99,9 @@ class App:
 
         # Initialize the viewport to match window dimensions
         glViewport(0, 0, self.width, self.height)
+
+    def add_plugin(self, plugin: Plugin):
+        plugin.build(self)
 
     def startup(self) -> None:
         # Enable blending for transparent PNGs (Important for sprites!)

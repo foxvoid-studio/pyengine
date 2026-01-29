@@ -151,7 +151,7 @@ class RenderSystem(System):
         # ---------------------------------------------------------
         # 1. RENDER UI BOXES (Using self.box_mesh)
         # ---------------------------------------------------------
-        for entity, (transform, ui_box) in entity_manager.get_entities_with(Transform, UIBox):
+        for _, (transform, ui_box) in entity_manager.get_entities_with(Transform, UIBox):
             if not ui_box.material: continue
             
             shader = ui_box.material.shader

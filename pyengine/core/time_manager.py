@@ -1,7 +1,12 @@
 from sdl2 import SDL_GetPerformanceCounter, SDL_GetPerformanceFrequency
+from pyengine.ecs.resource import Resource, ResourceManager
+from pyengine.ecs.system import System
+from pyengine.ecs.plugin import Plugin
+from pyengine.ecs.scheduler import SchedulerType
+from typing import Optional
 
 
-class TimeManager:
+class TimeManager(Resource):
     """
     Manages the game loop timing, calculating delta time and FPS.
     """
@@ -79,3 +84,16 @@ class TimeManager:
         """Returns the calculated Frames Per Second."""
         return self._current_fps
     
+
+class TimeSystem(System):
+    def update(self, resources: ResourceManager):
+        time_manager: Optional[TimeManager] = resources.get(TimeManager)
+        if time_manager:
+            time_manager.update()
+
+
+class TimePlugin(Plugin):
+    def build(self, app):
+        app.resources.add(TimeManager())
+        app.scheduler.add(SchedulerType.Update, TimeSystem())
+        

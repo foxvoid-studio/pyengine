@@ -7,9 +7,10 @@ from pyengine.gl_utils.mesh import Mesh
 from pyengine.gl_utils.obj_loader import load_obj_model
 from pyengine.graphics.material import Material
 from pyengine.gui.font import Font
+from pyengine.ecs.resource import Resource
 
 
-class AssetManager:
+class AssetManager(Resource):
     """
     Centralized manager to load and store assets.
     Prevents loading the same asset multiple times (Caching).

@@ -4,7 +4,7 @@ from pyengine.core.time_manager import TimeManager
 from pyengine.ecs.system import System
 from pyengine.ecs.resource import ResourceManager
 
-class AnimationSystem(System):
+class Animation2dSystem(System):
     def update(self, resource: ResourceManager):
         entity_manager: EntityManager = resource.get(EntityManager)
         time_manager: TimeManager = resource.get(TimeManager)

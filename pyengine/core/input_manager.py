@@ -1,7 +1,8 @@
 from sdl2 import *
+from pyengine.ecs.resource import Resource
 
 
-class InputManager:
+class InputManager(Resource):
     """
     Handles keyboard and mouse input states.
     It tracks keys currently held down and keys pressed/released specifically during the current frame.
